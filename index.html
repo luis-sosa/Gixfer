@@ -268,11 +268,8 @@ input[type=range].msl::-moz-range-thumb{
   .slbl,.cl,.sll,.slv,.ml,.mv{ font-size:9px !important; }
   .hb  { font-size:7px !important; padding:10px 2px !important; }
   .fb  { font-size:9px !important; padding:8px 5px !important; }
-  .tb  { font-size:9px !important; padding:8px 4px !important; }
   .fg  { grid-template-columns:repeat(4,1fr) !important; }
-  .tg  { grid-template-columns:repeat(4,1fr) !important; }
   .cl  { font-size:9px !important; }
-  .tp  { font-size:14px !important; }
   .ub  { font-size:9px !important; padding:10px 8px !important; }
   .dtxt{ font-size:9px !important; }
   .dltr{ font-size:20px !important; }
@@ -282,8 +279,27 @@ input[type=range].msl::-moz-range-thumb{
   input[type=range].msl{ height:10px !important; }
   input[type=range].csl::-webkit-slider-thumb,
   input[type=range].msl::-webkit-slider-thumb{ width:18px !important; height:28px !important; }
-  .con{ gap:10px !important; padding:10px !important; }
-  .cb { gap:5px !important; }
+
+  /* Console: 2-column grid so everything fits without scrolling */
+  .con{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    grid-template-rows:auto !important;
+    gap:8px !important;
+    padding:8px !important;
+    align-items:start !important;
+  }
+
+  /* Hide TEMPO A/B and separators on mobile */
+  #cbTempoA, #cbTempoB, .con>.sep{ display:none !important; }
+
+  /* 2-col grid: EFFECTS left, TRANSITION right */
+  #cbEffects   { grid-column:1/2; }
+  #cbTransition{ grid-column:2/3; }
+
+  /* REC block left, CONTROLS right */
+  #cbRec       { grid-column:1/2; }
+  #cbControls  { grid-column:2/3; }
 }
 
 .fb{
@@ -469,8 +485,7 @@ input[type=range].msl::-moz-range-thumb{
   <!-- ── CONSOLE: only global controls ── -->
   <div class="con">
 
-    <div class="cb">
-      <div class="cl">TEMPO A</div>
+    <div class="cb" id="cbTempoA">
       <div class="tp" id="tpA">---</div>
       <div class="tsub"><div class="led on"></div><div class="hb" style="flex:1">HUE</div><div class="hb on">INV</div></div>
       <div class="hb">SEQUENCE</div>
@@ -478,8 +493,7 @@ input[type=range].msl::-moz-range-thumb{
 
     <div class="sep"></div>
 
-    <div class="cb">
-      <div class="cl">EFFECTS</div>
+    <div class="cb" id="cbEffects">
       <div class="fg">
         <div class="fb" id="fx-chromatic" onclick="fx('chromatic')">CHROMA</div>
         <div class="fb" id="fx-scanlines" onclick="fx('scanlines')">SCAN</div>
@@ -492,8 +506,7 @@ input[type=range].msl::-moz-range-thumb{
       </div>
     </div>
 
-    <div class="cb">
-      <div class="cl">TRANSITION</div>
+    <div class="cb" id="cbTransition">
       <!-- Desktop: button grid -->
       <div class="tg sel" id="tg">
         <div class="tb"    onclick="bl('source-over',this)">NORMAL</div>
@@ -530,7 +543,7 @@ input[type=range].msl::-moz-range-thumb{
 
     <div class="sep"></div>
 
-    <div class="cb" style="align-items:center">
+    <div class="cb" id="cbRec" style="align-items:center">
       <button class="rb" id="btnRec" onclick="rec()">REC</button>
       <div class="rd" id="rd">
         <div class="rt" id="rt">0:00</div>
@@ -542,13 +555,11 @@ input[type=range].msl::-moz-range-thumb{
 
     <div class="sep"></div>
 
-    <div class="cb">
-      <div class="cl">CONTROLS</div>
+    <div class="cb" id="cbControls">
       <button class="rnd-btn" onclick="rnd()">RANDOM</button>
     </div>
 
-    <div class="cb" style="margin-left:auto">
-      <div class="cl">TEMPO B</div>
+    <div class="cb" id="cbTempoB" style="margin-left:auto">
       <div class="tp" id="tpB">---</div>
       <div class="tsub"><div class="led on"></div><div class="hb" style="flex:1">HUE</div><div class="hb">INV</div></div>
       <div class="hb">SEQUENCE</div>
