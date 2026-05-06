@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GIFXER</title>
+<meta name="theme-color" content="#24231d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GIFXER">
+<link rel="manifest" href="manifest.json">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --cream:#d4cfc4;--dot:rgba(0,0,0,0.14);
+  --panel:#38372f;--dk:#24231d;--lt:#4a4840;--inset:#18170f;
+  --scr:#070707;--lbl:#8a8470;--white:#e0ddd4;
+  --red:#bb1111;--redlit:#ff2222;--grn:#22dd44;
+  --f:clamp(7px,0.55vw + 5.2px,11px);
+}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'Press Start 2P',monospace;
+  font-size:var(--f);
+  background:var(--dk);color:var(--white);
+  display:flex;flex-direction:column;
+}
+
+/* ── HEADER ── */
+header{
+  flex-shrink:0;height:44px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;
+  background:var(--cream);
+  background-image:radial-gradient(var(--dot) 1px,transparent 1px);
+  background-size:5px 5px;
+  border-bottom:3px solid #111;
+}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:20px;height:20px;display:grid;grid-template:10px 10px/10px 10px;}
+.logo-icon span{background:#111;}
+.logo-icon span:nth-child(2){background:var(--cream);border:2px solid #111;}
+.logo-name{font-size:clamp(10px,1.1vw,16px);color:#111;}
+.logo-sub{font-size:clamp(5px,0.4vw,7px);color:#555;margin-top:4px;}
+.hdr-r{font-size:clamp(5px,0.35vw,7px);color:#777;text-align:right;line-height:2;}
+
+/* ── APP ── */
+#app{
+  flex:1;min-height:0;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  background:var(--panel);
+  background-image:
+    radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),
+    radial-gradient(rgba(0,0,0,0.25) 1px,transparent 1px);
+  background-size:3px 3px,7px 7px;
+  background-position:0 0,1px 1px;
+}
+
+/* ══════════════════════════════════════════════
+   SCREENS ROW
+   Mobile:  [out-col full width] then [ab-row grid]
+   Desktop: [side-col A] [out-col ×2] [side-col B]
+══════════════════════════════════════════════ */
+.screens{
+  flex-shrink:0;
+  display:flex;flex-direction:column;
+  gap:6px;padding:8px 8px 4px;
+}
+.out-col{width:100%;display:flex;flex-direction:column;gap:4px;}
+.ab-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 0 4px;flex-shrink:0;}
+.side-col{display:flex;flex-direction:column;gap:4px;}
+
+@media(min-width:680px){
+  .screens{flex-direction:row;align-items:flex-start;gap:6px;}
+  .out-col{flex:2;order:2;}
+  /* dissolve ab-row so side-cols become direct flex children of .screens */
+  .ab-row{display:contents;}
+  .side-col{flex:1;order:1;}
+  .side-col+.side-col{order:3;}
+}
+
+/* Screen label row */
+.slbl{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:clamp(5px,0.45vw,8px);color:var(--lbl);
+  flex-shrink:0;padding:0 2px;
+}
+
+/* ── BEZEL: always 4:3, width drives height ── */
+.bezel{
+  width:100%;
+  aspect-ratio:4/3;
+  background:var(--scr);
+  border:2px solid #111;
+  box-shadow:inset 0 0 12px rgba(0,0,0,0.9),1px 1px 0 #555,-1px -1px 0 #111;
+  position:relative;overflow:hidden;flex-shrink:0;
+}
+.bezel::before{content:'+';position:absolute;top:2px;left:3px;font-size:5px;color:#1a1a1a;z-index:3;}
+.bezel::after {content:'+';position:absolute;bottom:2px;right:3px;font-size:5px;color:#1a1a1a;z-index:3;}
+/* Cap heights so they never push controls off screen */
+.out-col  .bezel{max-height:44vh;}
+.side-col .bezel{max-height:28vh;}
+
+/* ── DROP ZONE ── */
+.dz{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  cursor:pointer;
+  background-image:repeating-conic-gradient(#111 0% 25%,#080808 0% 50%);
+  background-size:8px 8px;
+}
+.dz.loaded{background:#000;background-image:none;}
+.dz.over{outline:2px solid #fff;}
+.dz input[type=file]{display:none;}
+.dltr{font-size:clamp(12px,2vw,22px);color:#222;z-index:1;}
+.dtxt{font-size:clamp(5px,0.5vw,8px);color:#222;z-index:1;text-align:center;line-height:2;}
+.dz.loaded .dltr,.dz.loaded .dtxt{display:none;}
+
+/* ── GIF PREVIEW CANVAS: letterboxed inside bezel ── */
+.gc{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  max-width:100%;max-height:100%;
+  opacity:0;
+}
+.gc.on{opacity:1;}
+
+/* ── OUTPUT CANVAS: fills 4:3 bezel, object-fit keeps it correct ── */
+#oc{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:contain;
+  image-rendering:pixelated;
+  display:block;
+}
+.ow{position:absolute;inset:0;}
+.ow.rec::after{
+  content:'';position:absolute;inset:0;
+  border:3px solid var(--redlit);pointer-events:none;z-index:5;
+  animation:blnk .5s steps(1) infinite;
+}
+@keyframes blnk{0%,100%{opacity:1}50%{opacity:0}}
+.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.ph span{font-size:clamp(5px,0.5vw,8px);color:#2a2a2a;text-align:center;line-height:3;}
+.ro{position:absolute;top:4px;left:5px;font-size:clamp(5px,0.5vw,8px);color:var(--redlit);display:none;z-index:6;}
+.ro.on{display:block;}
+
+/* B&W state: apply grayscale to the preview bezel so source window reflects it */
+.bezel.bw-on{ filter: grayscale(1); }
+.led{width:7px;height:7px;border-radius:50%;background:#1a0a0a;border:1px solid #111;flex-shrink:0;}
+.led.on{background:var(--grn);box-shadow:0 0 4px var(--grn);}
+.led.r.on{background:var(--redlit);box-shadow:0 0 4px var(--redlit);}
+
+/* ── CHANNEL CONTROLS (under gif a / gif b) ── */
+.cch{display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding:2px 0;}
+.slr{display:flex;align-items:center;gap:4px;}
+.sll{font-size:clamp(5px,0.4vw,7px);color:var(--lbl);width:36px;flex-shrink:0;}
+.slv{font-size:clamp(5px,0.4vw,7px);color:var(--grn);width:16px;text-align:right;flex-shrink:0;}
+input[type=range].csl{
+  flex:1;height:8px;appearance:none;
+  background:var(--inset);border:2px solid #444;outline:none;cursor:pointer;
+}
+input[type=range].csl::-webkit-slider-thumb{
+  appearance:none;width:clamp(8px,0.8vw,12px);height:clamp(10px,1vw,14px);
+  background:var(--lt);border:2px solid #777;box-shadow:0 1px 0 #111;cursor:pointer;
+}
+input[type=range].csl::-moz-range-thumb{
+  width:10px;height:13px;background:var(--lt);border:2px solid #777;border-radius:0;cursor:pointer;
+}
+.brow{display:flex;gap:2px;min-width:0;}
+.hb{
+  flex:1;min-width:0;
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(5px,0.5vw,8px);color:var(--lbl);
+  background:var(--dk);border:1px solid #333;
+  box-shadow:0 2px 0 #111,inset 0 1px 0 rgba(255,255,255,0.03);
+  padding:clamp(5px,0.5vh,9px) 2px;cursor:pointer;text-align:center;
+  position:relative;top:0;user-select:none;
+  overflow:hidden;white-space:nowrap;
+}
+.hb:active{top:2px;box-shadow:none;}
+.hb.on{background:#1a1a14;color:#fff;box-shadow:inset 0 1px 3px #000;}
+
+/* ── MASTER SLIDERS (under output) ── */
+.mrow{
+  flex-shrink:0;
+  background:var(--dk);
+  border-top:2px solid #111;border-bottom:2px solid #111;
+  padding:clamp(6px,0.8vh,12px) 10px;
+  display:flex;flex-direction:column;
+  gap:clamp(8px,1vh,14px);
+}
+.mg{display:flex;align-items:center;gap:6px;}
+.ml{font-size:clamp(5px,0.45vw,8px);color:var(--lbl);width:clamp(55px,5.5vw,80px);flex-shrink:0;}
+.mv{font-size:clamp(5px,0.45vw,8px);color:#88ff88;width:20px;text-align:right;flex-shrink:0;}
+input[type=range].msl{
+  flex:1;height:8px;appearance:none;
+  background:var(--inset);border:2px solid #444;outline:none;cursor:pointer;
+}
+input[type=range].msl::-webkit-slider-thumb{
+  appearance:none;width:clamp(8px,0.8vw,12px);height:clamp(10px,1vw,14px);
+  background:var(--lt);border:2px solid #777;box-shadow:0 1px 0 #111;
+}
+input[type=range].msl::-moz-range-thumb{
+  width:10px;height:13px;background:var(--lt);border:2px solid #777;border-radius:0;
+}
+
+/* ── CONSOLE ── */
+/* base: tg hidden until desktop query shows it */
+.tg{display:none;}
+
+.con{
+  flex-shrink:0;
+  background:var(--dk);
+  border-top:3px solid #111;
+  padding:clamp(6px,0.8vh,10px) 10px;
+  display:flex;flex-wrap:wrap;gap:clamp(6px,0.8vw,12px);
+  align-items:flex-start;
+  overflow-y:auto;
+}
+@media(min-width:680px){
+  .con{ flex:1; min-height:0; }
+}
+.cb{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+.cl{font-size:clamp(5px,0.45vw,7px);color:var(--lbl);margin-bottom:2px;}
+
+/* Tempo display */
+.tp{
+  background:#06100a;border:1px solid #111;color:var(--grn);
+  font-size:clamp(8px,0.9vw,13px);
+  padding:4px 8px;text-align:center;min-width:52px;
+  box-shadow:inset 0 0 6px rgba(0,0,0,0.9);
+}
+.tsub{display:flex;align-items:center;gap:3px;margin-top:3px;}
+
+/* Effects grid: 2 cols mobile → 4 cols desktop */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+@media(min-width:680px){.fg{grid-template-columns:repeat(4,1fr);}}
+
+/* Transition dropdown — mobile only */
+.tr-sel{
+  display:none;
+  width:100%;
+  font-family:'Press Start 2P',monospace;
+  font-size:9px;
+  background:var(--dk);
+  border:1px solid #555;
+  color:var(--white);
+  padding:9px 6px;
+  cursor:pointer;
+  outline:none;
+}
+@media(max-width:679px){
+  .tr-sel{ display:block; }
+  /* Shrink output so controls fit without scrolling */
+  .out-col .bezel{ max-height:28vh; width:100%; }
+  .side-col .bezel{ max-height:20vh; }
+}
+@media(min-width:680px){
+  .tg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+}
+
+/* ── MOBILE: bump everything up for readability ── */
+@media(max-width:679px){
+  :root{ --f:10px; }
+  .slbl,.cl,.sll,.slv,.ml,.mv{ font-size:9px !important; }
+  .hb  { font-size:7px !important; padding:10px 2px !important; }
+  .fb  { font-size:9px !important; padding:8px 5px !important; }
+  .tb  { font-size:9px !important; padding:8px 4px !important; }
+  .fg  { grid-template-columns:repeat(4,1fr) !important; }
+  .tg  { grid-template-columns:repeat(4,1fr) !important; }
+  .cl  { font-size:9px !important; }
+  .tp  { font-size:14px !important; }
+  .ub  { font-size:9px !important; padding:10px 8px !important; }
+  .dtxt{ font-size:9px !important; }
+  .dltr{ font-size:20px !important; }
+  .logo-name{ font-size:14px !important; }
+  .logo-sub,.hdr-r{ font-size:7px !important; }
+  input[type=range].csl,
+  input[type=range].msl{ height:10px !important; }
+  input[type=range].csl::-webkit-slider-thumb,
+  input[type=range].msl::-webkit-slider-thumb{ width:18px !important; height:28px !important; }
+  .con{ gap:10px !important; padding:10px !important; }
+  .cb { gap:5px !important; }
+}
+
+.fb{
+  font-family:'Press Start 2P',monospace;font-size:clamp(5px,0.45vw,7px);color:var(--lbl);
+  background:var(--dk);border:1px solid #333;
+  box-shadow:0 1px 0 #555,inset 0 1px 0 rgba(255,255,255,0.03);
+  padding:clamp(5px,0.55vh,8px) 4px;cursor:pointer;text-align:center;
+  position:relative;top:0;user-select:none;
+}
+.fb:active{top:1px;box-shadow:none;}
+.fb.on{color:#fff;background:#1a1914;box-shadow:inset 0 1px 3px #000;}
+.fb.on::before{content:'* ';color:var(--redlit);}
+
+.tb{
+  font-family:'Press Start 2P',monospace;font-size:clamp(5px,0.45vw,7px);color:#999;
+  background:var(--dk);border:1px solid #555;
+  padding:clamp(5px,0.55vh,8px) 3px;cursor:pointer;text-align:center;
+  position:relative;top:0;user-select:none;
+}
+.tb:active{top:1px;}
+.tb:hover{color:#ddd;border-color:#777;}
+.tg.sel .tb{color:#555;border-color:#333;}
+.tg.sel .tb:hover{color:#999;}
+.tb.on{color:#fff!important;background:#222;border-color:#aaa!important;box-shadow:inset 0 1px 3px #000;}
+
+.sep{width:2px;background:#111;border-left:1px solid #444;align-self:stretch;flex-shrink:0;}
+
+/* REC */
+.rb{
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(7px,0.7vw,10px);color:#fff;
+  background:var(--red);border:2px solid #111;
+  padding:clamp(10px,1.2vh,16px) clamp(8px,1vw,14px);
+  cursor:pointer;text-align:center;
+  box-shadow:0 4px 0 #660000,inset 0 1px 0 rgba(255,80,80,0.3);
+  position:relative;top:0;min-width:52px;user-select:none;
+}
+.rb:active{top:4px;box-shadow:none;}
+.rb.on{animation:blnk .5s steps(1) infinite;box-shadow:0 0 10px var(--redlit);}
+.rd{display:none;background:#060006;border:1px solid #111;padding:4px 6px;text-align:center;}
+.rd.on{display:block;}
+.rt{font-size:clamp(8px,0.9vw,13px);color:var(--redlit);}
+.rl{font-size:clamp(4px,0.35vw,6px);color:#552222;margin-top:2px;}
+
+/* Util */
+.ub{
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(5px,0.5vw,8px);color:var(--lbl);
+  background:var(--dk);border:1px solid #333;
+  box-shadow:0 2px 0 #111;
+  padding:clamp(7px,0.8vh,11px) 8px;cursor:pointer;text-align:center;
+  position:relative;top:0;user-select:none;white-space:nowrap;
+}
+.ub:active{top:2px;box-shadow:none;}
+.ub.exp{color:#88ff88;border-color:#224422;}
+.ub:disabled{color:#888;border-color:#333;box-shadow:none;cursor:default;}
+
+/* RANDOM — chunky like REC, orange */
+.rnd-btn{
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(7px,0.7vw,10px);color:#111;
+  background:#e07000;border:2px solid #111;
+  padding:clamp(10px,1.2vh,16px) clamp(8px,1vw,14px);
+  cursor:pointer;text-align:center;
+  box-shadow:0 4px 0 #7a3d00,inset 0 1px 0 rgba(255,180,80,0.3);
+  position:relative;top:0;min-width:52px;user-select:none;
+}
+.rnd-btn:hover{background:#f07800;}
+.rnd-btn:active{top:4px;box-shadow:none;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <span></span><span></span>
+      <span></span><span style="background:var(--cream);border:2px solid #111"></span>
+    </div>
+    <div>
+      <div class="logo-name">GIFXER</div>
+      <div class="logo-sub">BETA 2.0 · MORESTARCH</div>
+    </div>
+  </div>
+  <div class="hdr-r">GIF GLITCH<br>MIXER</div>
+</header>
+
+<div id="app">
+  <div class="screens">
+
+    <!-- ── OUTPUT COLUMN: bezel + its own sliders directly beneath ── -->
+    <div class="out-col">
+      <div class="slbl"><span>OUTPUT</span><div class="led r" id="ledRec"></div></div>
+      <div class="bezel">
+        <div class="ow" id="outWrap">
+          <canvas id="oc" width="480" height="360"></canvas>
+          <div class="ph" id="ph"><span>DROP TWO GIFS<br>TO BEGIN</span></div>
+          <div class="ro" id="ro">0:00</div>
+        </div>
+      </div>
+      <!-- Master sliders directly under output — affect output only -->
+      <div class="mrow">
+        <div class="mg">
+          <div class="ml">MIX A→B</div>
+          <input type="range" class="msl" id="slMix" min="0" max="100" value="50" oninput="sv('mix',this.value)">
+          <div class="mv" id="vMix">50</div>
+        </div>
+        <div class="mg">
+          <div class="ml">GLITCH PWR</div>
+          <input type="range" class="msl" id="slInt" min="0" max="100" value="40" oninput="sv('int',this.value)">
+          <div class="mv" id="vInt">40</div>
+        </div>
+        <div class="mg">
+          <div class="ml">GLITCH RND</div>
+          <input type="range" class="msl" id="slCh" min="0" max="100" value="20" oninput="sv('ch',this.value)">
+          <div class="mv" id="vCh">20</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── A + B COLUMNS: each has bezel + its own controls beneath ── -->
+    <div class="ab-row">
+
+      <!-- GIF A column -->
+      <div class="side-col">
+        <div class="slbl"><span>GIF A</span><div class="led" id="ledA"></div></div>
+        <div class="bezel" id="bezelA">
+          <div class="dz" id="dz1" onclick="document.getElementById('f1').click()"
+            ondragover="ov(event,1)" ondragleave="ol(1)" ondrop="od(event,1)">
+            <input type="file" id="f1" accept="image/gif,.gif" onchange="load(this.files[0],1)">
+            <div class="dltr" id="lt1">A</div>
+            <div class="dtxt" id="tx1">TAP TO LOAD</div>
+            <canvas class="gc" id="gc1"></canvas>
+          </div>
+        </div>
+        <!-- Channel controls directly under GIF A -->
+        <div class="cch">
+          <div class="slr">
+            <div class="sll">SPEED</div>
+            <input type="range" class="csl" id="spA" min="1" max="20" value="10" oninput="spd('A',this.value)">
+            <div class="slv" id="vsA">10</div>
+          </div>
+          <div class="brow">
+            <div class="hb" id="lpA" onclick="tgl('A','bounce')">BOUNCE</div>
+            <div class="hb"    id="ivA" onclick="tgl('A','inv')">INV</div>
+            <div class="hb"    id="bwA" onclick="tgl('A','bw')">B&W</div>
+            <div class="hb"    id="sqA" onclick="seq('A')">SEQ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GIF B column -->
+      <div class="side-col">
+        <div class="slbl"><span>GIF B</span><div class="led" id="ledB"></div></div>
+        <div class="bezel" id="bezelB">
+          <div class="dz" id="dz2" onclick="document.getElementById('f2').click()"
+            ondragover="ov(event,2)" ondragleave="ol(2)" ondrop="od(event,2)">
+            <input type="file" id="f2" accept="image/gif,.gif" onchange="load(this.files[0],2)">
+            <div class="dltr" id="lt2">B</div>
+            <div class="dtxt" id="tx2">TAP TO LOAD</div>
+            <canvas class="gc" id="gc2"></canvas>
+          </div>
+        </div>
+        <!-- Channel controls directly under GIF B -->
+        <div class="cch">
+          <div class="slr">
+            <div class="sll">SPEED</div>
+            <input type="range" class="csl" id="spB" min="1" max="20" value="10" oninput="spd('B',this.value)">
+            <div class="slv" id="vsB">10</div>
+          </div>
+          <div class="brow">
+            <div class="hb" id="lpB" onclick="tgl('B','bounce')">BOUNCE</div>
+            <div class="hb"    id="ivB" onclick="tgl('B','inv')">INV</div>
+            <div class="hb"    id="bwB" onclick="tgl('B','bw')">B&W</div>
+            <div class="hb"    id="sqB" onclick="seq('B')">SEQ</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /ab-row -->
+  </div><!-- /screens -->
+
+  <!-- ── CONSOLE: only global controls ── -->
+  <div class="con">
+
+    <div class="cb">
+      <div class="cl">TEMPO A</div>
+      <div class="tp" id="tpA">---</div>
+      <div class="tsub"><div class="led on"></div><div class="hb" style="flex:1">HUE</div><div class="hb on">INV</div></div>
+      <div class="hb">SEQUENCE</div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="cb">
+      <div class="cl">EFFECTS</div>
+      <div class="fg">
+        <div class="fb" id="fx-chromatic" onclick="fx('chromatic')">CHROMA</div>
+        <div class="fb" id="fx-scanlines" onclick="fx('scanlines')">SCAN</div>
+        <div class="fb" id="fx-pixelsort" onclick="fx('pixelsort')">SORT</div>
+        <div class="fb" id="fx-noise"     onclick="fx('noise')">NOISE</div>
+        <div class="fb" id="fx-displace"  onclick="fx('displace')">DISPL</div>
+        <div class="fb" id="fx-posterize" onclick="fx('posterize')">POST</div>
+        <div class="fb" id="fx-invert"    onclick="fx('invert')">INVERT</div>
+        <div class="fb" id="fx-vhs"       onclick="fx('vhs')">VHS</div>
+      </div>
+    </div>
+
+    <div class="cb">
+      <div class="cl">TRANSITION</div>
+      <!-- Desktop: button grid -->
+      <div class="tg sel" id="tg">
+        <div class="tb"    onclick="bl('source-over',this)">NORMAL</div>
+        <div class="tb"    onclick="bl('multiply',this)">MULTI</div>
+        <div class="tb"    onclick="bl('screen',this)">SCREEN</div>
+        <div class="tb"    onclick="bl('overlay',this)">OVERLAY</div>
+        <div class="tb"    onclick="bl('hard-light',this)">HARD LT</div>
+        <div class="tb on" onclick="bl('difference',this)">DIFF</div>
+        <div class="tb"    onclick="bl('exclusion',this)">EXCLUS</div>
+        <div class="tb"    onclick="bl('color-dodge',this)">DODGE</div>
+        <div class="tb"    onclick="bl('color-burn',this)">BURN</div>
+        <div class="tb"    onclick="bl('xor',this)">XOR</div>
+        <div class="tb"    onclick="bl('hue',this)">HUE</div>
+        <div class="tb"    onclick="bl('saturation',this)">SAT</div>
+        <div class="tb"    onclick="bl('luminosity',this)">LUMA</div>
+      </div>
+      <!-- Mobile: dropdown -->
+      <select class="tr-sel" id="trSel" onchange="blFromSelect(this)">
+        <option value="source-over">NORMAL</option>
+        <option value="multiply">MULTIPLY</option>
+        <option value="screen">SCREEN</option>
+        <option value="overlay">OVERLAY</option>
+        <option value="hard-light">HARD LT</option>
+        <option value="difference" selected>DIFF</option>
+        <option value="exclusion">EXCLUSION</option>
+        <option value="color-dodge">DODGE</option>
+        <option value="color-burn">BURN</option>
+        <option value="xor">XOR</option>
+        <option value="hue">HUE</option>
+        <option value="saturation">SAT</option>
+        <option value="luminosity">LUMA</option>
+      </select>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="cb" style="align-items:center">
+      <button class="rb" id="btnRec" onclick="rec()">REC</button>
+      <div class="rd" id="rd">
+        <div class="rt" id="rt">0:00</div>
+        <div class="rl">RECORDING</div>
+      </div>
+      <button class="ub" id="btnExp" onclick="exp()" disabled>EXPORT WEBM</button>
+      <button class="ub" id="btnExpGif" onclick="expGif()" disabled>EXPORT GIF</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="cb">
+      <div class="cl">CONTROLS</div>
+      <button class="rnd-btn" onclick="rnd()">RANDOM</button>
+    </div>
+
+    <div class="cb" style="margin-left:auto">
+      <div class="cl">TEMPO B</div>
+      <div class="tp" id="tpB">---</div>
+      <div class="tsub"><div class="led on"></div><div class="hb" style="flex:1">HUE</div><div class="hb">INV</div></div>
+      <div class="hb">SEQUENCE</div>
+    </div>
+
+  </div><!-- /con -->
+</div><!-- /app -->
+
+<script>
+// omggif inlined — exposes GifReader and GifWriter as window globals
+// (c) Dean McNamee <dean@gmail.com>, 2013.
+//
+// https://github.com/deanm/omggif
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to
+// deal in the Software without restriction, including without limitation the
+// rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+// sell copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+// IN THE SOFTWARE.
+//
+// omggif is a JavaScript implementation of a GIF 89a encoder and decoder,
+// including animation and compression.  It does not rely on any specific
+// underlying system, so should run in the browser, Node, or Plask.
+
+"use strict";
+
+function GifWriter(buf, width, height, gopts) {
+  var p = 0;
+
+  var gopts = gopts === undefined ? { } : gopts;
+  var loop_count = gopts.loop === undefined ? null : gopts.loop;
+  var global_palette = gopts.palette === undefined ? null : gopts.palette;
+
+  if (width <= 0 || height <= 0 || width > 65535 || height > 65535)
+    throw new Error("Width/Height invalid.");
+
+  function check_palette_and_num_colors(palette) {
+    var num_colors = palette.length;
+    if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1)) {
+      throw new Error(
+          "Invalid code/color length, must be power of 2 and 2 .. 256.");
+    }
+    return num_colors;
+  }
+
+  // - Header.
+  buf[p++] = 0x47; buf[p++] = 0x49; buf[p++] = 0x46;  // GIF
+  buf[p++] = 0x38; buf[p++] = 0x39; buf[p++] = 0x61;  // 89a
+
+  // Handling of Global Color Table (palette) and background index.
+  var gp_num_colors_pow2 = 0;
+  var background = 0;
+  if (global_palette !== null) {
+    var gp_num_colors = check_palette_and_num_colors(global_palette);
+    while (gp_num_colors >>= 1) ++gp_num_colors_pow2;
+    gp_num_colors = 1 << gp_num_colors_pow2;
+    --gp_num_colors_pow2;
+    if (gopts.background !== undefined) {
+      background = gopts.background;
+      if (background >= gp_num_colors)
+        throw new Error("Background index out of range.");
+      // The GIF spec states that a background index of 0 should be ignored, so
+      // this is probably a mistake and you really want to set it to another
+      // slot in the palette.  But actually in the end most browsers, etc end
+      // up ignoring this almost completely (including for dispose background).
+      if (background === 0)
+        throw new Error("Background index explicitly passed as 0.");
+    }
+  }
+
+  // - Logical Screen Descriptor.
+  // NOTE(deanm): w/h apparently ignored by implementations, but set anyway.
+  buf[p++] = width & 0xff; buf[p++] = width >> 8 & 0xff;
+  buf[p++] = height & 0xff; buf[p++] = height >> 8 & 0xff;
+  // NOTE: Indicates 0-bpp original color resolution (unused?).
+  buf[p++] = (global_palette !== null ? 0x80 : 0) |  // Global Color Table Flag.
+             gp_num_colors_pow2;  // NOTE: No sort flag (unused?).
+  buf[p++] = background;  // Background Color Index.
+  buf[p++] = 0;  // Pixel aspect ratio (unused?).
+
+  // - Global Color Table
+  if (global_palette !== null) {
+    for (var i = 0, il = global_palette.length; i < il; ++i) {
+      var rgb = global_palette[i];
+      buf[p++] = rgb >> 16 & 0xff;
+      buf[p++] = rgb >> 8 & 0xff;
+      buf[p++] = rgb & 0xff;
+    }
+  }
+
+  if (loop_count !== null) {  // Netscape block for looping.
+    if (loop_count < 0 || loop_count > 65535)
+      throw new Error("Loop count invalid.")
+    // Extension code, label, and length.
+    buf[p++] = 0x21; buf[p++] = 0xff; buf[p++] = 0x0b;
+    // NETSCAPE2.0
+    buf[p++] = 0x4e; buf[p++] = 0x45; buf[p++] = 0x54; buf[p++] = 0x53;
+    buf[p++] = 0x43; buf[p++] = 0x41; buf[p++] = 0x50; buf[p++] = 0x45;
+    buf[p++] = 0x32; buf[p++] = 0x2e; buf[p++] = 0x30;
+    // Sub-block
+    buf[p++] = 0x03; buf[p++] = 0x01;
+    buf[p++] = loop_count & 0xff; buf[p++] = loop_count >> 8 & 0xff;
+    buf[p++] = 0x00;  // Terminator.
+  }
+
+
+  var ended = false;
+
+  this.addFrame = function(x, y, w, h, indexed_pixels, opts) {
+    if (ended === true) { --p; ended = false; }  // Un-end.
+
+    opts = opts === undefined ? { } : opts;
+
+    // TODO(deanm): Bounds check x, y.  Do they need to be within the virtual
+    // canvas width/height, I imagine?
+    if (x < 0 || y < 0 || x > 65535 || y > 65535)
+      throw new Error("x/y invalid.")
+
+    if (w <= 0 || h <= 0 || w > 65535 || h > 65535)
+      throw new Error("Width/Height invalid.")
+
+    if (indexed_pixels.length < w * h)
+      throw new Error("Not enough pixels for the frame size.");
+
+    var using_local_palette = true;
+    var palette = opts.palette;
+    if (palette === undefined || palette === null) {
+      using_local_palette = false;
+      palette = global_palette;
+    }
+
+    if (palette === undefined || palette === null)
+      throw new Error("Must supply either a local or global palette.");
+
+    var num_colors = check_palette_and_num_colors(palette);
+
+    // Compute the min_code_size (power of 2), destroying num_colors.
+    var min_code_size = 0;
+    while (num_colors >>= 1) ++min_code_size;
+    num_colors = 1 << min_code_size;  // Now we can easily get it back.
+
+    var delay = opts.delay === undefined ? 0 : opts.delay;
+
+    // From the spec:
+    //     0 -   No disposal specified. The decoder is
+    //           not required to take any action.
+    //     1 -   Do not dispose. The graphic is to be left
+    //           in place.
+    //     2 -   Restore to background color. The area used by the
+    //           graphic must be restored to the background color.
+    //     3 -   Restore to previous. The decoder is required to
+    //           restore the area overwritten by the graphic with
+    //           what was there prior to rendering the graphic.
+    //  4-7 -    To be defined.
+    // NOTE(deanm): Dispose background doesn't really work, apparently most
+    // browsers ignore the background palette index and clear to transparency.
+    var disposal = opts.disposal === undefined ? 0 : opts.disposal;
+    if (disposal < 0 || disposal > 3)  // 4-7 is reserved.
+      throw new Error("Disposal out of range.");
+
+    var use_transparency = false;
+    var transparent_index = 0;
+    if (opts.transparent !== undefined && opts.transparent !== null) {
+      use_transparency = true;
+      transparent_index = opts.transparent;
+      if (transparent_index < 0 || transparent_index >= num_colors)
+        throw new Error("Transparent color index.");
+    }
+
+    if (disposal !== 0 || use_transparency || delay !== 0) {
+      // - Graphics Control Extension
+      buf[p++] = 0x21; buf[p++] = 0xf9;  // Extension / Label.
+      buf[p++] = 4;  // Byte size.
+
+      buf[p++] = disposal << 2 | (use_transparency === true ? 1 : 0);
+      buf[p++] = delay & 0xff; buf[p++] = delay >> 8 & 0xff;
+      buf[p++] = transparent_index;  // Transparent color index.
+      buf[p++] = 0;  // Block Terminator.
+    }
+
+    // - Image Descriptor
+    buf[p++] = 0x2c;  // Image Seperator.
+    buf[p++] = x & 0xff; buf[p++] = x >> 8 & 0xff;  // Left.
+    buf[p++] = y & 0xff; buf[p++] = y >> 8 & 0xff;  // Top.
+    buf[p++] = w & 0xff; buf[p++] = w >> 8 & 0xff;
+    buf[p++] = h & 0xff; buf[p++] = h >> 8 & 0xff;
+    // NOTE: No sort flag (unused?).
+    // TODO(deanm): Support interlace.
+    buf[p++] = using_local_palette === true ? (0x80 | (min_code_size-1)) : 0;
+
+    // - Local Color Table
+    if (using_local_palette === true) {
+      for (var i = 0, il = palette.length; i < il; ++i) {
+        var rgb = palette[i];
+        buf[p++] = rgb >> 16 & 0xff;
+        buf[p++] = rgb >> 8 & 0xff;
+        buf[p++] = rgb & 0xff;
+      }
+    }
+
+    p = GifWriterOutputLZWCodeStream(
+            buf, p, min_code_size < 2 ? 2 : min_code_size, indexed_pixels);
+
+    return p;
+  };
+
+  this.end = function() {
+    if (ended === false) {
+      buf[p++] = 0x3b;  // Trailer.
+      ended = true;
+    }
+    return p;
+  };
+
+  this.getOutputBuffer = function() { return buf; };
+  this.setOutputBuffer = function(v) { buf = v; };
+  this.getOutputBufferPosition = function() { return p; };
+  this.setOutputBufferPosition = function(v) { p = v; };
+}
+
+// Main compression routine, palette indexes -> LZW code stream.
+// |index_stream| must have at least one entry.
+function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
+  buf[p++] = min_code_size;
+  var cur_subblock = p++;  // Pointing at the length field.
+
+  var clear_code = 1 << min_code_size;
+  var code_mask = clear_code - 1;
+  var eoi_code = clear_code + 1;
+  var next_code = eoi_code + 1;
+
+  var cur_code_size = min_code_size + 1;  // Number of bits per code.
+  var cur_shift = 0;
+  // We have at most 12-bit codes, so we should have to hold a max of 19
+  // bits here (and then we would write out).
+  var cur = 0;
+
+  function emit_bytes_to_buffer(bit_block_size) {
+    while (cur_shift >= bit_block_size) {
+      buf[p++] = cur & 0xff;
+      cur >>= 8; cur_shift -= 8;
+      if (p === cur_subblock + 256) {  // Finished a subblock.
+        buf[cur_subblock] = 255;
+        cur_subblock = p++;
+      }
+    }
+  }
+
+  function emit_code(c) {
+    cur |= c << cur_shift;
+    cur_shift += cur_code_size;
+    emit_bytes_to_buffer(8);
+  }
+
+  // I am not an expert on the topic, and I don't want to write a thesis.
+  // However, it is good to outline here the basic algorithm and the few data
+  // structures and optimizations here that make this implementation fast.
+  // The basic idea behind LZW is to build a table of previously seen runs
+  // addressed by a short id (herein called output code).  All data is
+  // referenced by a code, which represents one or more values from the
+  // original input stream.  All input bytes can be referenced as the same
+  // value as an output code.  So if you didn't want any compression, you
+  // could more or less just output the original bytes as codes (there are
+  // some details to this, but it is the idea).  In order to achieve
+  // compression, values greater then the input range (codes can be up to
+  // 12-bit while input only 8-bit) represent a sequence of previously seen
+  // inputs.  The decompressor is able to build the same mapping while
+  // decoding, so there is always a shared common knowledge between the
+  // encoding and decoder, which is also important for "timing" aspects like
+  // how to handle variable bit width code encoding.
+  //
+  // One obvious but very important consequence of the table system is there
+  // is always a unique id (at most 12-bits) to map the runs.  'A' might be
+  // 4, then 'AA' might be 10, 'AAA' 11, 'AAAA' 12, etc.  This relationship
+  // can be used for an effecient lookup strategy for the code mapping.  We
+  // need to know if a run has been seen before, and be able to map that run
+  // to the output code.  Since we start with known unique ids (input bytes),
+  // and then from those build more unique ids (table entries), we can
+  // continue this chain (almost like a linked list) to always have small
+  // integer values that represent the current byte chains in the encoder.
+  // This means instead of tracking the input bytes (AAAABCD) to know our
+  // current state, we can track the table entry for AAAABC (it is guaranteed
+  // to exist by the nature of the algorithm) and the next character D.
+  // Therefor the tuple of (table_entry, byte) is guaranteed to also be
+  // unique.  This allows us to create a simple lookup key for mapping input
+  // sequences to codes (table indices) without having to store or search
+  // any of the code sequences.  So if 'AAAA' has a table entry of 12, the
+  // tuple of ('AAAA', K) for any input byte K will be unique, and can be our
+  // key.  This leads to a integer value at most 20-bits, which can always
+  // fit in an SMI value and be used as a fast sparse array / object key.
+
+  // Output code for the current contents of the index buffer.
+  var ib_code = index_stream[0] & code_mask;  // Load first input index.
+  var code_table = { };  // Key'd on our 20-bit "tuple".
+
+  emit_code(clear_code);  // Spec says first code should be a clear code.
+
+  // First index already loaded, process the rest of the stream.
+  for (var i = 1, il = index_stream.length; i < il; ++i) {
+    var k = index_stream[i] & code_mask;
+    var cur_key = ib_code << 8 | k;  // (prev, k) unique tuple.
+    var cur_code = code_table[cur_key];  // buffer + k.
+
+    // Check if we have to create a new code table entry.
+    if (cur_code === undefined) {  // We don't have buffer + k.
+      // Emit index buffer (without k).
+      // This is an inline version of emit_code, because this is the core
+      // writing routine of the compressor (and V8 cannot inline emit_code
+      // because it is a closure here in a different context).  Additionally
+      // we can call emit_byte_to_buffer less often, because we can have
+      // 30-bits (from our 31-bit signed SMI), and we know our codes will only
+      // be 12-bits, so can safely have 18-bits there without overflow.
+      // emit_code(ib_code);
+      cur |= ib_code << cur_shift;
+      cur_shift += cur_code_size;
+      while (cur_shift >= 8) {
+        buf[p++] = cur & 0xff;
+        cur >>= 8; cur_shift -= 8;
+        if (p === cur_subblock + 256) {  // Finished a subblock.
+          buf[cur_subblock] = 255;
+          cur_subblock = p++;
+        }
+      }
+
+      if (next_code === 4096) {  // Table full, need a clear.
+        emit_code(clear_code);
+        next_code = eoi_code + 1;
+        cur_code_size = min_code_size + 1;
+        code_table = { };
+      } else {  // Table not full, insert a new entry.
+        // Increase our variable bit code sizes if necessary.  This is a bit
+        // tricky as it is based on "timing" between the encoding and
+        // decoder.  From the encoders perspective this should happen after
+        // we've already emitted the index buffer and are about to create the
+        // first table entry that would overflow our current code bit size.
+        if (next_code >= (1 << cur_code_size)) ++cur_code_size;
+        code_table[cur_key] = next_code++;  // Insert into code table.
+      }
+
+      ib_code = k;  // Index buffer to single input k.
+    } else {
+      ib_code = cur_code;  // Index buffer to sequence in code table.
+    }
+  }
+
+  emit_code(ib_code);  // There will still be something in the index buffer.
+  emit_code(eoi_code);  // End Of Information.
+
+  // Flush / finalize the sub-blocks stream to the buffer.
+  emit_bytes_to_buffer(1);
+
+  // Finish the sub-blocks, writing out any unfinished lengths and
+  // terminating with a sub-block of length 0.  If we have already started
+  // but not yet used a sub-block it can just become the terminator.
+  if (cur_subblock + 1 === p) {  // Started but unused.
+    buf[cur_subblock] = 0;
+  } else {  // Started and used, write length and additional terminator block.
+    buf[cur_subblock] = p - cur_subblock - 1;
+    buf[p++] = 0;
+  }
+  return p;
+}
+
+function GifReader(buf) {
+  var p = 0;
+
+  // - Header (GIF87a or GIF89a).
+  if (buf[p++] !== 0x47 ||            buf[p++] !== 0x49 || buf[p++] !== 0x46 ||
+      buf[p++] !== 0x38 || (buf[p++]+1 & 0xfd) !== 0x38 || buf[p++] !== 0x61) {
+    throw new Error("Invalid GIF 87a/89a header.");
+  }
+
+  // - Logical Screen Descriptor.
+  var width = buf[p++] | buf[p++] << 8;
+  var height = buf[p++] | buf[p++] << 8;
+  var pf0 = buf[p++];  // <Packed Fields>.
+  var global_palette_flag = pf0 >> 7;
+  var num_global_colors_pow2 = pf0 & 0x7;
+  var num_global_colors = 1 << (num_global_colors_pow2 + 1);
+  var background = buf[p++];
+  buf[p++];  // Pixel aspect ratio (unused?).
+
+  var global_palette_offset = null;
+  var global_palette_size   = null;
+
+  if (global_palette_flag) {
+    global_palette_offset = p;
+    global_palette_size = num_global_colors;
+    p += num_global_colors * 3;  // Seek past palette.
+  }
+
+  var no_eof = true;
+
+  var frames = [ ];
+
+  var delay = 0;
+  var transparent_index = null;
+  var disposal = 0;  // 0 - No disposal specified.
+  var loop_count = null;
+
+  this.width = width;
+  this.height = height;
+
+  while (no_eof && p < buf.length) {
+    switch (buf[p++]) {
+      case 0x21:  // Graphics Control Extension Block
+        switch (buf[p++]) {
+          case 0xff:  // Application specific block
+            // Try if it's a Netscape block (with animation loop counter).
+            if (buf[p   ] !== 0x0b ||  // 21 FF already read, check block size.
+                // NETSCAPE2.0
+                buf[p+1 ] == 0x4e && buf[p+2 ] == 0x45 && buf[p+3 ] == 0x54 &&
+                buf[p+4 ] == 0x53 && buf[p+5 ] == 0x43 && buf[p+6 ] == 0x41 &&
+                buf[p+7 ] == 0x50 && buf[p+8 ] == 0x45 && buf[p+9 ] == 0x32 &&
+                buf[p+10] == 0x2e && buf[p+11] == 0x30 &&
+                // Sub-block
+                buf[p+12] == 0x03 && buf[p+13] == 0x01 && buf[p+16] == 0) {
+              p += 14;
+              loop_count = buf[p++] | buf[p++] << 8;
+              p++;  // Skip terminator.
+            } else {  // We don't know what it is, just try to get past it.
+              p += 12;
+              while (true) {  // Seek through subblocks.
+                var block_size = buf[p++];
+                // Bad block size (ex: undefined from an out of bounds read).
+                if (!(block_size >= 0)) throw Error("Invalid block size");
+                if (block_size === 0) break;  // 0 size is terminator
+                p += block_size;
+              }
+            }
+            break;
+
+          case 0xf9:  // Graphics Control Extension
+            if (buf[p++] !== 0x4 || buf[p+4] !== 0)
+              throw new Error("Invalid graphics extension block.");
+            var pf1 = buf[p++];
+            delay = buf[p++] | buf[p++] << 8;
+            transparent_index = buf[p++];
+            if ((pf1 & 1) === 0) transparent_index = null;
+            disposal = pf1 >> 2 & 0x7;
+            p++;  // Skip terminator.
+            break;
+
+          case 0xfe:  // Comment Extension.
+            while (true) {  // Seek through subblocks.
+              var block_size = buf[p++];
+              // Bad block size (ex: undefined from an out of bounds read).
+              if (!(block_size >= 0)) throw Error("Invalid block size");
+              if (block_size === 0) break;  // 0 size is terminator
+              // console.log(buf.slice(p, p+block_size).toString('ascii'));
+              p += block_size;
+            }
+            break;
+
+          default:
+            throw new Error(
+                "Unknown graphic control label: 0x" + buf[p-1].toString(16));
+        }
+        break;
+
+      case 0x2c:  // Image Descriptor.
+        var x = buf[p++] | buf[p++] << 8;
+        var y = buf[p++] | buf[p++] << 8;
+        var w = buf[p++] | buf[p++] << 8;
+        var h = buf[p++] | buf[p++] << 8;
+        var pf2 = buf[p++];
+        var local_palette_flag = pf2 >> 7;
+        var interlace_flag = pf2 >> 6 & 1;
+        var num_local_colors_pow2 = pf2 & 0x7;
+        var num_local_colors = 1 << (num_local_colors_pow2 + 1);
+        var palette_offset = global_palette_offset;
+        var palette_size = global_palette_size;
+        var has_local_palette = false;
+        if (local_palette_flag) {
+          var has_local_palette = true;
+          palette_offset = p;  // Override with local palette.
+          palette_size = num_local_colors;
+          p += num_local_colors * 3;  // Seek past palette.
+        }
+
+        var data_offset = p;
+
+        p++;  // codesize
+        while (true) {
+          var block_size = buf[p++];
+          // Bad block size (ex: undefined from an out of bounds read).
+          if (!(block_size >= 0)) throw Error("Invalid block size");
+          if (block_size === 0) break;  // 0 size is terminator
+          p += block_size;
+        }
+
+        frames.push({x: x, y: y, width: w, height: h,
+                     has_local_palette: has_local_palette,
+                     palette_offset: palette_offset,
+                     palette_size: palette_size,
+                     data_offset: data_offset,
+                     data_length: p - data_offset,
+                     transparent_index: transparent_index,
+                     interlaced: !!interlace_flag,
+                     delay: delay,
+                     disposal: disposal});
+        break;
+
+      case 0x3b:  // Trailer Marker (end of file).
+        no_eof = false;
+        break;
+
+      default:
+        throw new Error("Unknown gif block: 0x" + buf[p-1].toString(16));
+        break;
+    }
+  }
+
+  this.numFrames = function() {
+    return frames.length;
+  };
+
+  this.loopCount = function() {
+    return loop_count;
+  };
+
+  this.frameInfo = function(frame_num) {
+    if (frame_num < 0 || frame_num >= frames.length)
+      throw new Error("Frame index out of range.");
+    return frames[frame_num];
+  }
+
+  this.decodeAndBlitFrameBGRA = function(frame_num, pixels) {
+    var frame = this.frameInfo(frame_num);
+    var num_pixels = frame.width * frame.height;
+    var index_stream = new Uint8Array(num_pixels);  // At most 8-bit indices.
+    GifReaderLZWOutputIndexStream(
+        buf, frame.data_offset, index_stream, num_pixels);
+    var palette_offset = frame.palette_offset;
+
+    // NOTE(deanm): It seems to be much faster to compare index to 256 than
+    // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
+    // the profile, not sure if it's related to using a Uint8Array.
+    var trans = frame.transparent_index;
+    if (trans === null) trans = 256;
+
+    // We are possibly just blitting to a portion of the entire frame.
+    // That is a subrect within the framerect, so the additional pixels
+    // must be skipped over after we finished a scanline.
+    var framewidth  = frame.width;
+    var framestride = width - framewidth;
+    var xleft       = framewidth;  // Number of subrect pixels left in scanline.
+
+    // Output indicies of the top left and bottom right corners of the subrect.
+    var opbeg = ((frame.y * width) + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var op    = opbeg;
+
+    var scanstride = framestride * 4;
+
+    // Use scanstride to skip past the rows when interlacing.  This is skipping
+    // 7 rows for the first two passes, then 3 then 1.
+    if (frame.interlaced === true) {
+      scanstride += width * 4 * 7;  // Pass 1.
+    }
+
+    var interlaceskip = 8;  // Tracking the row interval in the current pass.
+
+    for (var i = 0, il = index_stream.length; i < il; ++i) {
+      var index = index_stream[i];
+
+      if (xleft === 0) {  // Beginning of new scan line
+        op += scanstride;
+        xleft = framewidth;
+        if (op >= opend) { // Catch the wrap to switch passes when interlacing.
+          scanstride = framestride * 4 + width * 4 * (interlaceskip-1);
+          // interlaceskip / 2 * 4 is interlaceskip << 1.
+          op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
+          interlaceskip >>= 1;
+        }
+      }
+
+      if (index === trans) {
+        op += 4;
+      } else {
+        var r = buf[palette_offset + index * 3];
+        var g = buf[palette_offset + index * 3 + 1];
+        var b = buf[palette_offset + index * 3 + 2];
+        pixels[op++] = b;
+        pixels[op++] = g;
+        pixels[op++] = r;
+        pixels[op++] = 255;
+      }
+      --xleft;
+    }
+  };
+
+  // I will go to copy and paste hell one day...
+  this.decodeAndBlitFrameRGBA = function(frame_num, pixels) {
+    var frame = this.frameInfo(frame_num);
+    var num_pixels = frame.width * frame.height;
+    var index_stream = new Uint8Array(num_pixels);  // At most 8-bit indices.
+    GifReaderLZWOutputIndexStream(
+        buf, frame.data_offset, index_stream, num_pixels);
+    var palette_offset = frame.palette_offset;
+
+    // NOTE(deanm): It seems to be much faster to compare index to 256 than
+    // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
+    // the profile, not sure if it's related to using a Uint8Array.
+    var trans = frame.transparent_index;
+    if (trans === null) trans = 256;
+
+    // We are possibly just blitting to a portion of the entire frame.
+    // That is a subrect within the framerect, so the additional pixels
+    // must be skipped over after we finished a scanline.
+    var framewidth  = frame.width;
+    var framestride = width - framewidth;
+    var xleft       = framewidth;  // Number of subrect pixels left in scanline.
+
+    // Output indicies of the top left and bottom right corners of the subrect.
+    var opbeg = ((frame.y * width) + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var op    = opbeg;
+
+    var scanstride = framestride * 4;
+
+    // Use scanstride to skip past the rows when interlacing.  This is skipping
+    // 7 rows for the first two passes, then 3 then 1.
+    if (frame.interlaced === true) {
+      scanstride += width * 4 * 7;  // Pass 1.
+    }
+
+    var interlaceskip = 8;  // Tracking the row interval in the current pass.
+
+    for (var i = 0, il = index_stream.length; i < il; ++i) {
+      var index = index_stream[i];
+
+      if (xleft === 0) {  // Beginning of new scan line
+        op += scanstride;
+        xleft = framewidth;
+        if (op >= opend) { // Catch the wrap to switch passes when interlacing.
+          scanstride = framestride * 4 + width * 4 * (interlaceskip-1);
+          // interlaceskip / 2 * 4 is interlaceskip << 1.
+          op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
+          interlaceskip >>= 1;
+        }
+      }
+
+      if (index === trans) {
+        op += 4;
+      } else {
+        var r = buf[palette_offset + index * 3];
+        var g = buf[palette_offset + index * 3 + 1];
+        var b = buf[palette_offset + index * 3 + 2];
+        pixels[op++] = r;
+        pixels[op++] = g;
+        pixels[op++] = b;
+        pixels[op++] = 255;
+      }
+      --xleft;
+    }
+  };
+}
+
+function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
+  var min_code_size = code_stream[p++];
+
+  var clear_code = 1 << min_code_size;
+  var eoi_code = clear_code + 1;
+  var next_code = eoi_code + 1;
+
+  var cur_code_size = min_code_size + 1;  // Number of bits per code.
+  // NOTE: This shares the same name as the encoder, but has a different
+  // meaning here.  Here this masks each code coming from the code stream.
+  var code_mask = (1 << cur_code_size) - 1;
+  var cur_shift = 0;
+  var cur = 0;
+
+  var op = 0;  // Output pointer.
+
+  var subblock_size = code_stream[p++];
+
+  // TODO(deanm): Would using a TypedArray be any faster?  At least it would
+  // solve the fast mode / backing store uncertainty.
+  // var code_table = Array(4096);
+  var code_table = new Int32Array(4096);  // Can be signed, we only use 20 bits.
+
+  var prev_code = null;  // Track code-1.
+
+  while (true) {
+    // Read up to two bytes, making sure we always 12-bits for max sized code.
+    while (cur_shift < 16) {
+      if (subblock_size === 0) break;  // No more data to be read.
+
+      cur |= code_stream[p++] << cur_shift;
+      cur_shift += 8;
+
+      if (subblock_size === 1) {  // Never let it get to 0 to hold logic above.
+        subblock_size = code_stream[p++];  // Next subblock.
+      } else {
+        --subblock_size;
+      }
+    }
+
+    // TODO(deanm): We should never really get here, we should have received
+    // and EOI.
+    if (cur_shift < cur_code_size)
+      break;
+
+    var code = cur & code_mask;
+    cur >>= cur_code_size;
+    cur_shift -= cur_code_size;
+
+    // TODO(deanm): Maybe should check that the first code was a clear code,
+    // at least this is what you're supposed to do.  But actually our encoder
+    // now doesn't emit a clear code first anyway.
+    if (code === clear_code) {
+      // We don't actually have to clear the table.  This could be a good idea
+      // for greater error checking, but we don't really do any anyway.  We
+      // will just track it with next_code and overwrite old entries.
+
+      next_code = eoi_code + 1;
+      cur_code_size = min_code_size + 1;
+      code_mask = (1 << cur_code_size) - 1;
+
+      // Don't update prev_code ?
+      prev_code = null;
+      continue;
+    } else if (code === eoi_code) {
+      break;
+    }
+
+    // We have a similar situation as the decoder, where we want to store
+    // variable length entries (code table entries), but we want to do in a
+    // faster manner than an array of arrays.  The code below stores sort of a
+    // linked list within the code table, and then "chases" through it to
+    // construct the dictionary entries.  When a new entry is created, just the
+    // last byte is stored, and the rest (prefix) of the entry is only
+    // referenced by its table entry.  Then the code chases through the
+    // prefixes until it reaches a single byte code.  We have to chase twice,
+    // first to compute the length, and then to actually copy the data to the
+    // output (backwards, since we know the length).  The alternative would be
+    // storing something in an intermediate stack, but that doesn't make any
+    // more sense.  I implemented an approach where it also stored the length
+    // in the code table, although it's a bit tricky because you run out of
+    // bits (12 + 12 + 8), but I didn't measure much improvements (the table
+    // entries are generally not the long).  Even when I created benchmarks for
+    // very long table entries the complexity did not seem worth it.
+    // The code table stores the prefix entry in 12 bits and then the suffix
+    // byte in 8 bits, so each entry is 20 bits.
+
+    var chase_code = code < next_code ? code : prev_code;
+
+    // Chase what we will output, either {CODE} or {CODE-1}.
+    var chase_length = 0;
+    var chase = chase_code;
+    while (chase > clear_code) {
+      chase = code_table[chase] >> 8;
+      ++chase_length;
+    }
+
+    var k = chase;
+
+    var op_end = op + chase_length + (chase_code !== code ? 1 : 0);
+    if (op_end > output_length) {
+      console.log("Warning, gif stream longer than expected.");
+      return;
+    }
+
+    // Already have the first byte from the chase, might as well write it fast.
+    output[op++] = k;
+
+    op += chase_length;
+    var b = op;  // Track pointer, writing backwards.
+
+    if (chase_code !== code)  // The case of emitting {CODE-1} + k.
+      output[op++] = k;
+
+    chase = chase_code;
+    while (chase_length--) {
+      chase = code_table[chase];
+      output[--b] = chase & 0xff;  // Write backwards.
+      chase >>= 8;  // Pull down to the prefix code.
+    }
+
+    if (prev_code !== null && next_code < 4096) {
+      code_table[next_code++] = prev_code << 8 | k;
+      // TODO(deanm): Figure out this clearing vs code growth logic better.  I
+      // have an feeling that it should just happen somewhere else, for now it
+      // is awkward between when we grow past the max and then hit a clear code.
+      // For now just check if we hit the max 12-bits (then a clear code should
+      // follow, also of course encoded in 12-bits).
+      if (next_code >= code_mask+1 && cur_code_size < 12) {
+        ++cur_code_size;
+        code_mask = code_mask << 1 | 1;
+      }
+    }
+
+    prev_code = code;
+  }
+
+  if (op !== output_length) {
+    console.log("Warning, gif stream shorter than expected.");
+  }
+
+  return output;
+}
+
+// CommonJS.
+try { exports.GifWriter = GifWriter; exports.GifReader = GifReader } catch(e) {}
+
+// Expose as globals (omggif uses CommonJS exports, not window globals)
+if(typeof GifReader === 'undefined') window.GifReader = GifReader;
+if(typeof GifWriter === 'undefined') window.GifWriter = GifWriter;
+</script>
+<script>
+// gif.js inlined
+// gif.js 0.2.0 - https://github.com/jnordberg/gif.js
+(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.GIF=f()}})(function(){var define,module,exports;return function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}({1:[function(require,module,exports){function EventEmitter(){this._events=this._events||{};this._maxListeners=this._maxListeners||undefined}module.exports=EventEmitter;EventEmitter.EventEmitter=EventEmitter;EventEmitter.prototype._events=undefined;EventEmitter.prototype._maxListeners=undefined;EventEmitter.defaultMaxListeners=10;EventEmitter.prototype.setMaxListeners=function(n){if(!isNumber(n)||n<0||isNaN(n))throw TypeError("n must be a positive number");this._maxListeners=n;return this};EventEmitter.prototype.emit=function(type){var er,handler,len,args,i,listeners;if(!this._events)this._events={};if(type==="error"){if(!this._events.error||isObject(this._events.error)&&!this._events.error.length){er=arguments[1];if(er instanceof Error){throw er}else{var err=new Error('Uncaught, unspecified "error" event. ('+er+")");err.context=er;throw err}}}handler=this._events[type];if(isUndefined(handler))return false;if(isFunction(handler)){switch(arguments.length){case 1:handler.call(this);break;case 2:handler.call(this,arguments[1]);break;case 3:handler.call(this,arguments[1],arguments[2]);break;default:args=Array.prototype.slice.call(arguments,1);handler.apply(this,args)}}else if(isObject(handler)){args=Array.prototype.slice.call(arguments,1);listeners=handler.slice();len=listeners.length;for(i=0;i<len;i++)listeners[i].apply(this,args)}return true};EventEmitter.prototype.addListener=function(type,listener){var m;if(!isFunction(listener))throw TypeError("listener must be a function");if(!this._events)this._events={};if(this._events.newListener)this.emit("newListener",type,isFunction(listener.listener)?listener.listener:listener);if(!this._events[type])this._events[type]=listener;else if(isObject(this._events[type]))this._events[type].push(listener);else this._events[type]=[this._events[type],listener];if(isObject(this._events[type])&&!this._events[type].warned){if(!isUndefined(this._maxListeners)){m=this._maxListeners}else{m=EventEmitter.defaultMaxListeners}if(m&&m>0&&this._events[type].length>m){this._events[type].warned=true;console.error("(node) warning: possible EventEmitter memory "+"leak detected. %d listeners added. "+"Use emitter.setMaxListeners() to increase limit.",this._events[type].length);if(typeof console.trace==="function"){console.trace()}}}return this};EventEmitter.prototype.on=EventEmitter.prototype.addListener;EventEmitter.prototype.once=function(type,listener){if(!isFunction(listener))throw TypeError("listener must be a function");var fired=false;function g(){this.removeListener(type,g);if(!fired){fired=true;listener.apply(this,arguments)}}g.listener=listener;this.on(type,g);return this};EventEmitter.prototype.removeListener=function(type,listener){var list,position,length,i;if(!isFunction(listener))throw TypeError("listener must be a function");if(!this._events||!this._events[type])return this;list=this._events[type];length=list.length;position=-1;if(list===listener||isFunction(list.listener)&&list.listener===listener){delete this._events[type];if(this._events.removeListener)this.emit("removeListener",type,listener)}else if(isObject(list)){for(i=length;i-- >0;){if(list[i]===listener||list[i].listener&&list[i].listener===listener){position=i;break}}if(position<0)return this;if(list.length===1){list.length=0;delete this._events[type]}else{list.splice(position,1)}if(this._events.removeListener)this.emit("removeListener",type,listener)}return this};EventEmitter.prototype.removeAllListeners=function(type){var key,listeners;if(!this._events)return this;if(!this._events.removeListener){if(arguments.length===0)this._events={};else if(this._events[type])delete this._events[type];return this}if(arguments.length===0){for(key in this._events){if(key==="removeListener")continue;this.removeAllListeners(key)}this.removeAllListeners("removeListener");this._events={};return this}listeners=this._events[type];if(isFunction(listeners)){this.removeListener(type,listeners)}else if(listeners){while(listeners.length)this.removeListener(type,listeners[listeners.length-1])}delete this._events[type];return this};EventEmitter.prototype.listeners=function(type){var ret;if(!this._events||!this._events[type])ret=[];else if(isFunction(this._events[type]))ret=[this._events[type]];else ret=this._events[type].slice();return ret};EventEmitter.prototype.listenerCount=function(type){if(this._events){var evlistener=this._events[type];if(isFunction(evlistener))return 1;else if(evlistener)return evlistener.length}return 0};EventEmitter.listenerCount=function(emitter,type){return emitter.listenerCount(type)};function isFunction(arg){return typeof arg==="function"}function isNumber(arg){return typeof arg==="number"}function isObject(arg){return typeof arg==="object"&&arg!==null}function isUndefined(arg){return arg===void 0}},{}],2:[function(require,module,exports){var UA,browser,mode,platform,ua;ua=navigator.userAgent.toLowerCase();platform=navigator.platform.toLowerCase();UA=ua.match(/(opera|ie|firefox|chrome|version)[\s\/:]([\w\d\.]+)?.*?(safari|version[\s\/:]([\w\d\.]+)|$)/)||[null,"unknown",0];mode=UA[1]==="ie"&&document.documentMode;browser={name:UA[1]==="version"?UA[3]:UA[1],version:mode||parseFloat(UA[1]==="opera"&&UA[4]?UA[4]:UA[2]),platform:{name:ua.match(/ip(?:ad|od|hone)/)?"ios":(ua.match(/(?:webos|android)/)||platform.match(/mac|win|linux/)||["other"])[0]}};browser[browser.name]=true;browser[browser.name+parseInt(browser.version,10)]=true;browser.platform[browser.platform.name]=true;module.exports=browser},{}],3:[function(require,module,exports){var EventEmitter,GIF,browser,extend=function(child,parent){for(var key in parent){if(hasProp.call(parent,key))child[key]=parent[key]}function ctor(){this.constructor=child}ctor.prototype=parent.prototype;child.prototype=new ctor;child.__super__=parent.prototype;return child},hasProp={}.hasOwnProperty,indexOf=[].indexOf||function(item){for(var i=0,l=this.length;i<l;i++){if(i in this&&this[i]===item)return i}return-1},slice=[].slice;EventEmitter=require("events").EventEmitter;browser=require("./browser.coffee");GIF=function(superClass){var defaults,frameDefaults;extend(GIF,superClass);defaults={workerScript:"gif.worker.js",workers:2,repeat:0,background:"#fff",quality:10,width:null,height:null,transparent:null,debug:false,dither:false};frameDefaults={delay:500,copy:false};function GIF(options){var base,key,value;this.running=false;this.options={};this.frames=[];this.freeWorkers=[];this.activeWorkers=[];this.setOptions(options);for(key in defaults){value=defaults[key];if((base=this.options)[key]==null){base[key]=value}}}GIF.prototype.setOption=function(key,value){this.options[key]=value;if(this._canvas!=null&&(key==="width"||key==="height")){return this._canvas[key]=value}};GIF.prototype.setOptions=function(options){var key,results,value;results=[];for(key in options){if(!hasProp.call(options,key))continue;value=options[key];results.push(this.setOption(key,value))}return results};GIF.prototype.addFrame=function(image,options){var frame,key;if(options==null){options={}}frame={};frame.transparent=this.options.transparent;for(key in frameDefaults){frame[key]=options[key]||frameDefaults[key]}if(this.options.width==null){this.setOption("width",image.width)}if(this.options.height==null){this.setOption("height",image.height)}if(typeof ImageData!=="undefined"&&ImageData!==null&&image instanceof ImageData){frame.data=image.data}else if(typeof CanvasRenderingContext2D!=="undefined"&&CanvasRenderingContext2D!==null&&image instanceof CanvasRenderingContext2D||typeof WebGLRenderingContext!=="undefined"&&WebGLRenderingContext!==null&&image instanceof WebGLRenderingContext){if(options.copy){frame.data=this.getContextData(image)}else{frame.context=image}}else if(image.childNodes!=null){if(options.copy){frame.data=this.getImageData(image)}else{frame.image=image}}else{throw new Error("Invalid image")}return this.frames.push(frame)};GIF.prototype.render=function(){var i,j,numWorkers,ref;if(this.running){throw new Error("Already running")}if(this.options.width==null||this.options.height==null){throw new Error("Width and height must be set prior to rendering")}this.running=true;this.nextFrame=0;this.finishedFrames=0;this.imageParts=function(){var j,ref,results;results=[];for(i=j=0,ref=this.frames.length;0<=ref?j<ref:j>ref;i=0<=ref?++j:--j){results.push(null)}return results}.call(this);numWorkers=this.spawnWorkers();if(this.options.globalPalette===true){this.renderNextFrame()}else{for(i=j=0,ref=numWorkers;0<=ref?j<ref:j>ref;i=0<=ref?++j:--j){this.renderNextFrame()}}this.emit("start");return this.emit("progress",0)};GIF.prototype.abort=function(){var worker;while(true){worker=this.activeWorkers.shift();if(worker==null){break}this.log("killing active worker");worker.terminate()}this.running=false;return this.emit("abort")};GIF.prototype.spawnWorkers=function(){var j,numWorkers,ref,results;numWorkers=Math.min(this.options.workers,this.frames.length);(function(){results=[];for(var j=ref=this.freeWorkers.length;ref<=numWorkers?j<numWorkers:j>numWorkers;ref<=numWorkers?j++:j--){results.push(j)}return results}).apply(this).forEach(function(_this){return function(i){var worker;_this.log("spawning worker "+i);worker=new Worker(_this.options.workerScript);worker.onmessage=function(event){_this.activeWorkers.splice(_this.activeWorkers.indexOf(worker),1);_this.freeWorkers.push(worker);return _this.frameFinished(event.data)};return _this.freeWorkers.push(worker)}}(this));return numWorkers};GIF.prototype.frameFinished=function(frame){var i,j,ref;this.log("frame "+frame.index+" finished - "+this.activeWorkers.length+" active");this.finishedFrames++;this.emit("progress",this.finishedFrames/this.frames.length);this.imageParts[frame.index]=frame;if(this.options.globalPalette===true){this.options.globalPalette=frame.globalPalette;this.log("global palette analyzed");if(this.frames.length>2){for(i=j=1,ref=this.freeWorkers.length;1<=ref?j<ref:j>ref;i=1<=ref?++j:--j){this.renderNextFrame()}}}if(indexOf.call(this.imageParts,null)>=0){return this.renderNextFrame()}else{return this.finishRendering()}};GIF.prototype.finishRendering=function(){var data,frame,i,image,j,k,l,len,len1,len2,len3,offset,page,ref,ref1,ref2;len=0;ref=this.imageParts;for(j=0,len1=ref.length;j<len1;j++){frame=ref[j];len+=(frame.data.length-1)*frame.pageSize+frame.cursor}len+=frame.pageSize-frame.cursor;this.log("rendering finished - filesize "+Math.round(len/1e3)+"kb");data=new Uint8Array(len);offset=0;ref1=this.imageParts;for(k=0,len2=ref1.length;k<len2;k++){frame=ref1[k];ref2=frame.data;for(i=l=0,len3=ref2.length;l<len3;i=++l){page=ref2[i];data.set(page,offset);if(i===frame.data.length-1){offset+=frame.cursor}else{offset+=frame.pageSize}}}image=new Blob([data],{type:"image/gif"});return this.emit("finished",image,data)};GIF.prototype.renderNextFrame=function(){var frame,task,worker;if(this.freeWorkers.length===0){throw new Error("No free workers")}if(this.nextFrame>=this.frames.length){return}frame=this.frames[this.nextFrame++];worker=this.freeWorkers.shift();task=this.getTask(frame);this.log("starting frame "+(task.index+1)+" of "+this.frames.length);this.activeWorkers.push(worker);return worker.postMessage(task)};GIF.prototype.getContextData=function(ctx){return ctx.getImageData(0,0,this.options.width,this.options.height).data};GIF.prototype.getImageData=function(image){var ctx;if(this._canvas==null){this._canvas=document.createElement("canvas");this._canvas.width=this.options.width;this._canvas.height=this.options.height}ctx=this._canvas.getContext("2d");ctx.setFill=this.options.background;ctx.fillRect(0,0,this.options.width,this.options.height);ctx.drawImage(image,0,0);return this.getContextData(ctx)};GIF.prototype.getTask=function(frame){var index,task;index=this.frames.indexOf(frame);task={index:index,last:index===this.frames.length-1,delay:frame.delay,transparent:frame.transparent,width:this.options.width,height:this.options.height,quality:this.options.quality,dither:this.options.dither,globalPalette:this.options.globalPalette,repeat:this.options.repeat,canTransfer:browser.name==="chrome"};if(frame.data!=null){task.data=frame.data}else if(frame.context!=null){task.data=this.getContextData(frame.context)}else if(frame.image!=null){task.data=this.getImageData(frame.image)}else{throw new Error("Invalid frame")}return task};GIF.prototype.log=function(){var args;args=1<=arguments.length?slice.call(arguments,0):[];if(!this.options.debug){return}return console.log.apply(console,args)};return GIF}(EventEmitter);module.exports=GIF},{"./browser.coffee":2,events:1}]},{},[3])(3)});
+//# sourceMappingURL=gif.js.map
+
+</script>
+<script>
+// gif.worker.js stored as string for blob URL (avoids CORS)
+const _gifWorkerSrc = '// gif.worker.js 0.2.0 - https://github.com/jnordberg/gif.js\n(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module \'"+o+"\'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){var NeuQuant=require("./TypedNeuQuant.js");var LZWEncoder=require("./LZWEncoder.js");function ByteArray(){this.page=-1;this.pages=[];this.newPage()}ByteArray.pageSize=4096;ByteArray.charMap={};for(var i=0;i<256;i++)ByteArray.charMap[i]=String.fromCharCode(i);ByteArray.prototype.newPage=function(){this.pages[++this.page]=new Uint8Array(ByteArray.pageSize);this.cursor=0};ByteArray.prototype.getData=function(){var rv="";for(var p=0;p<this.pages.length;p++){for(var i=0;i<ByteArray.pageSize;i++){rv+=ByteArray.charMap[this.pages[p][i]]}}return rv};ByteArray.prototype.writeByte=function(val){if(this.cursor>=ByteArray.pageSize)this.newPage();this.pages[this.page][this.cursor++]=val};ByteArray.prototype.writeUTFBytes=function(string){for(var l=string.length,i=0;i<l;i++)this.writeByte(string.charCodeAt(i))};ByteArray.prototype.writeBytes=function(array,offset,length){for(var l=length||array.length,i=offset||0;i<l;i++)this.writeByte(array[i])};function GIFEncoder(width,height){this.width=~~width;this.height=~~height;this.transparent=null;this.transIndex=0;this.repeat=-1;this.delay=0;this.image=null;this.pixels=null;this.indexedPixels=null;this.colorDepth=null;this.colorTab=null;this.neuQuant=null;this.usedEntry=new Array;this.palSize=7;this.dispose=-1;this.firstFrame=true;this.sample=10;this.dither=false;this.globalPalette=false;this.out=new ByteArray}GIFEncoder.prototype.setDelay=function(milliseconds){this.delay=Math.round(milliseconds/10)};GIFEncoder.prototype.setFrameRate=function(fps){this.delay=Math.round(100/fps)};GIFEncoder.prototype.setDispose=function(disposalCode){if(disposalCode>=0)this.dispose=disposalCode};GIFEncoder.prototype.setRepeat=function(repeat){this.repeat=repeat};GIFEncoder.prototype.setTransparent=function(color){this.transparent=color};GIFEncoder.prototype.addFrame=function(imageData){this.image=imageData;this.colorTab=this.globalPalette&&this.globalPalette.slice?this.globalPalette:null;this.getImagePixels();this.analyzePixels();if(this.globalPalette===true)this.globalPalette=this.colorTab;if(this.firstFrame){this.writeLSD();this.writePalette();if(this.repeat>=0){this.writeNetscapeExt()}}this.writeGraphicCtrlExt();this.writeImageDesc();if(!this.firstFrame&&!this.globalPalette)this.writePalette();this.writePixels();this.firstFrame=false};GIFEncoder.prototype.finish=function(){this.out.writeByte(59)};GIFEncoder.prototype.setQuality=function(quality){if(quality<1)quality=1;this.sample=quality};GIFEncoder.prototype.setDither=function(dither){if(dither===true)dither="FloydSteinberg";this.dither=dither};GIFEncoder.prototype.setGlobalPalette=function(palette){this.globalPalette=palette};GIFEncoder.prototype.getGlobalPalette=function(){return this.globalPalette&&this.globalPalette.slice&&this.globalPalette.slice(0)||this.globalPalette};GIFEncoder.prototype.writeHeader=function(){this.out.writeUTFBytes("GIF89a")};GIFEncoder.prototype.analyzePixels=function(){if(!this.colorTab){this.neuQuant=new NeuQuant(this.pixels,this.sample);this.neuQuant.buildColormap();this.colorTab=this.neuQuant.getColormap()}if(this.dither){this.ditherPixels(this.dither.replace("-serpentine",""),this.dither.match(/-serpentine/)!==null)}else{this.indexPixels()}this.pixels=null;this.colorDepth=8;this.palSize=7;if(this.transparent!==null){this.transIndex=this.findClosest(this.transparent,true)}};GIFEncoder.prototype.indexPixels=function(imgq){var nPix=this.pixels.length/3;this.indexedPixels=new Uint8Array(nPix);var k=0;for(var j=0;j<nPix;j++){var index=this.findClosestRGB(this.pixels[k++]&255,this.pixels[k++]&255,this.pixels[k++]&255);this.usedEntry[index]=true;this.indexedPixels[j]=index}};GIFEncoder.prototype.ditherPixels=function(kernel,serpentine){var kernels={FalseFloydSteinberg:[[3/8,1,0],[3/8,0,1],[2/8,1,1]],FloydSteinberg:[[7/16,1,0],[3/16,-1,1],[5/16,0,1],[1/16,1,1]],Stucki:[[8/42,1,0],[4/42,2,0],[2/42,-2,1],[4/42,-1,1],[8/42,0,1],[4/42,1,1],[2/42,2,1],[1/42,-2,2],[2/42,-1,2],[4/42,0,2],[2/42,1,2],[1/42,2,2]],Atkinson:[[1/8,1,0],[1/8,2,0],[1/8,-1,1],[1/8,0,1],[1/8,1,1],[1/8,0,2]]};if(!kernel||!kernels[kernel]){throw"Unknown dithering kernel: "+kernel}var ds=kernels[kernel];var index=0,height=this.height,width=this.width,data=this.pixels;var direction=serpentine?-1:1;this.indexedPixels=new Uint8Array(this.pixels.length/3);for(var y=0;y<height;y++){if(serpentine)direction=direction*-1;for(var x=direction==1?0:width-1,xend=direction==1?width:0;x!==xend;x+=direction){index=y*width+x;var idx=index*3;var r1=data[idx];var g1=data[idx+1];var b1=data[idx+2];idx=this.findClosestRGB(r1,g1,b1);this.usedEntry[idx]=true;this.indexedPixels[index]=idx;idx*=3;var r2=this.colorTab[idx];var g2=this.colorTab[idx+1];var b2=this.colorTab[idx+2];var er=r1-r2;var eg=g1-g2;var eb=b1-b2;for(var i=direction==1?0:ds.length-1,end=direction==1?ds.length:0;i!==end;i+=direction){var x1=ds[i][1];var y1=ds[i][2];if(x1+x>=0&&x1+x<width&&y1+y>=0&&y1+y<height){var d=ds[i][0];idx=index+x1+y1*width;idx*=3;data[idx]=Math.max(0,Math.min(255,data[idx]+er*d));data[idx+1]=Math.max(0,Math.min(255,data[idx+1]+eg*d));data[idx+2]=Math.max(0,Math.min(255,data[idx+2]+eb*d))}}}}};GIFEncoder.prototype.findClosest=function(c,used){return this.findClosestRGB((c&16711680)>>16,(c&65280)>>8,c&255,used)};GIFEncoder.prototype.findClosestRGB=function(r,g,b,used){if(this.colorTab===null)return-1;if(this.neuQuant&&!used){return this.neuQuant.lookupRGB(r,g,b)}var c=b|g<<8|r<<16;var minpos=0;var dmin=256*256*256;var len=this.colorTab.length;for(var i=0,index=0;i<len;index++){var dr=r-(this.colorTab[i++]&255);var dg=g-(this.colorTab[i++]&255);var db=b-(this.colorTab[i++]&255);var d=dr*dr+dg*dg+db*db;if((!used||this.usedEntry[index])&&d<dmin){dmin=d;minpos=index}}return minpos};GIFEncoder.prototype.getImagePixels=function(){var w=this.width;var h=this.height;this.pixels=new Uint8Array(w*h*3);var data=this.image;var srcPos=0;var count=0;for(var i=0;i<h;i++){for(var j=0;j<w;j++){this.pixels[count++]=data[srcPos++];this.pixels[count++]=data[srcPos++];this.pixels[count++]=data[srcPos++];srcPos++}}};GIFEncoder.prototype.writeGraphicCtrlExt=function(){this.out.writeByte(33);this.out.writeByte(249);this.out.writeByte(4);var transp,disp;if(this.transparent===null){transp=0;disp=0}else{transp=1;disp=2}if(this.dispose>=0){disp=dispose&7}disp<<=2;this.out.writeByte(0|disp|0|transp);this.writeShort(this.delay);this.out.writeByte(this.transIndex);this.out.writeByte(0)};GIFEncoder.prototype.writeImageDesc=function(){this.out.writeByte(44);this.writeShort(0);this.writeShort(0);this.writeShort(this.width);this.writeShort(this.height);if(this.firstFrame||this.globalPalette){this.out.writeByte(0)}else{this.out.writeByte(128|0|0|0|this.palSize)}};GIFEncoder.prototype.writeLSD=function(){this.writeShort(this.width);this.writeShort(this.height);this.out.writeByte(128|112|0|this.palSize);this.out.writeByte(0);this.out.writeByte(0)};GIFEncoder.prototype.writeNetscapeExt=function(){this.out.writeByte(33);this.out.writeByte(255);this.out.writeByte(11);this.out.writeUTFBytes("NETSCAPE2.0");this.out.writeByte(3);this.out.writeByte(1);this.writeShort(this.repeat);this.out.writeByte(0)};GIFEncoder.prototype.writePalette=function(){this.out.writeBytes(this.colorTab);var n=3*256-this.colorTab.length;for(var i=0;i<n;i++)this.out.writeByte(0)};GIFEncoder.prototype.writeShort=function(pValue){this.out.writeByte(pValue&255);this.out.writeByte(pValue>>8&255)};GIFEncoder.prototype.writePixels=function(){var enc=new LZWEncoder(this.width,this.height,this.indexedPixels,this.colorDepth);enc.encode(this.out)};GIFEncoder.prototype.stream=function(){return this.out};module.exports=GIFEncoder},{"./LZWEncoder.js":2,"./TypedNeuQuant.js":3}],2:[function(require,module,exports){var EOF=-1;var BITS=12;var HSIZE=5003;var masks=[0,1,3,7,15,31,63,127,255,511,1023,2047,4095,8191,16383,32767,65535];function LZWEncoder(width,height,pixels,colorDepth){var initCodeSize=Math.max(2,colorDepth);var accum=new Uint8Array(256);var htab=new Int32Array(HSIZE);var codetab=new Int32Array(HSIZE);var cur_accum,cur_bits=0;var a_count;var free_ent=0;var maxcode;var clear_flg=false;var g_init_bits,ClearCode,EOFCode;function char_out(c,outs){accum[a_count++]=c;if(a_count>=254)flush_char(outs)}function cl_block(outs){cl_hash(HSIZE);free_ent=ClearCode+2;clear_flg=true;output(ClearCode,outs)}function cl_hash(hsize){for(var i=0;i<hsize;++i)htab[i]=-1}function compress(init_bits,outs){var fcode,c,i,ent,disp,hsize_reg,hshift;g_init_bits=init_bits;clear_flg=false;n_bits=g_init_bits;maxcode=MAXCODE(n_bits);ClearCode=1<<init_bits-1;EOFCode=ClearCode+1;free_ent=ClearCode+2;a_count=0;ent=nextPixel();hshift=0;for(fcode=HSIZE;fcode<65536;fcode*=2)++hshift;hshift=8-hshift;hsize_reg=HSIZE;cl_hash(hsize_reg);output(ClearCode,outs);outer_loop:while((c=nextPixel())!=EOF){fcode=(c<<BITS)+ent;i=c<<hshift^ent;if(htab[i]===fcode){ent=codetab[i];continue}else if(htab[i]>=0){disp=hsize_reg-i;if(i===0)disp=1;do{if((i-=disp)<0)i+=hsize_reg;if(htab[i]===fcode){ent=codetab[i];continue outer_loop}}while(htab[i]>=0)}output(ent,outs);ent=c;if(free_ent<1<<BITS){codetab[i]=free_ent++;htab[i]=fcode}else{cl_block(outs)}}output(ent,outs);output(EOFCode,outs)}function encode(outs){outs.writeByte(initCodeSize);remaining=width*height;curPixel=0;compress(initCodeSize+1,outs);outs.writeByte(0)}function flush_char(outs){if(a_count>0){outs.writeByte(a_count);outs.writeBytes(accum,0,a_count);a_count=0}}function MAXCODE(n_bits){return(1<<n_bits)-1}function nextPixel(){if(remaining===0)return EOF;--remaining;var pix=pixels[curPixel++];return pix&255}function output(code,outs){cur_accum&=masks[cur_bits];if(cur_bits>0)cur_accum|=code<<cur_bits;else cur_accum=code;cur_bits+=n_bits;while(cur_bits>=8){char_out(cur_accum&255,outs);cur_accum>>=8;cur_bits-=8}if(free_ent>maxcode||clear_flg){if(clear_flg){maxcode=MAXCODE(n_bits=g_init_bits);clear_flg=false}else{++n_bits;if(n_bits==BITS)maxcode=1<<BITS;else maxcode=MAXCODE(n_bits)}}if(code==EOFCode){while(cur_bits>0){char_out(cur_accum&255,outs);cur_accum>>=8;cur_bits-=8}flush_char(outs)}}this.encode=encode}module.exports=LZWEncoder},{}],3:[function(require,module,exports){var ncycles=100;var netsize=256;var maxnetpos=netsize-1;var netbiasshift=4;var intbiasshift=16;var intbias=1<<intbiasshift;var gammashift=10;var gamma=1<<gammashift;var betashift=10;var beta=intbias>>betashift;var betagamma=intbias<<gammashift-betashift;var initrad=netsize>>3;var radiusbiasshift=6;var radiusbias=1<<radiusbiasshift;var initradius=initrad*radiusbias;var radiusdec=30;var alphabiasshift=10;var initalpha=1<<alphabiasshift;var alphadec;var radbiasshift=8;var radbias=1<<radbiasshift;var alpharadbshift=alphabiasshift+radbiasshift;var alpharadbias=1<<alpharadbshift;var prime1=499;var prime2=491;var prime3=487;var prime4=503;var minpicturebytes=3*prime4;function NeuQuant(pixels,samplefac){var network;var netindex;var bias;var freq;var radpower;function init(){network=[];netindex=new Int32Array(256);bias=new Int32Array(netsize);freq=new Int32Array(netsize);radpower=new Int32Array(netsize>>3);var i,v;for(i=0;i<netsize;i++){v=(i<<netbiasshift+8)/netsize;network[i]=new Float64Array([v,v,v,0]);freq[i]=intbias/netsize;bias[i]=0}}function unbiasnet(){for(var i=0;i<netsize;i++){network[i][0]>>=netbiasshift;network[i][1]>>=netbiasshift;network[i][2]>>=netbiasshift;network[i][3]=i}}function altersingle(alpha,i,b,g,r){network[i][0]-=alpha*(network[i][0]-b)/initalpha;network[i][1]-=alpha*(network[i][1]-g)/initalpha;network[i][2]-=alpha*(network[i][2]-r)/initalpha}function alterneigh(radius,i,b,g,r){var lo=Math.abs(i-radius);var hi=Math.min(i+radius,netsize);var j=i+1;var k=i-1;var m=1;var p,a;while(j<hi||k>lo){a=radpower[m++];if(j<hi){p=network[j++];p[0]-=a*(p[0]-b)/alpharadbias;p[1]-=a*(p[1]-g)/alpharadbias;p[2]-=a*(p[2]-r)/alpharadbias}if(k>lo){p=network[k--];p[0]-=a*(p[0]-b)/alpharadbias;p[1]-=a*(p[1]-g)/alpharadbias;p[2]-=a*(p[2]-r)/alpharadbias}}}function contest(b,g,r){var bestd=~(1<<31);var bestbiasd=bestd;var bestpos=-1;var bestbiaspos=bestpos;var i,n,dist,biasdist,betafreq;for(i=0;i<netsize;i++){n=network[i];dist=Math.abs(n[0]-b)+Math.abs(n[1]-g)+Math.abs(n[2]-r);if(dist<bestd){bestd=dist;bestpos=i}biasdist=dist-(bias[i]>>intbiasshift-netbiasshift);if(biasdist<bestbiasd){bestbiasd=biasdist;bestbiaspos=i}betafreq=freq[i]>>betashift;freq[i]-=betafreq;bias[i]+=betafreq<<gammashift}freq[bestpos]+=beta;bias[bestpos]-=betagamma;return bestbiaspos}function inxbuild(){var i,j,p,q,smallpos,smallval,previouscol=0,startpos=0;for(i=0;i<netsize;i++){p=network[i];smallpos=i;smallval=p[1];for(j=i+1;j<netsize;j++){q=network[j];if(q[1]<smallval){smallpos=j;smallval=q[1]}}q=network[smallpos];if(i!=smallpos){j=q[0];q[0]=p[0];p[0]=j;j=q[1];q[1]=p[1];p[1]=j;j=q[2];q[2]=p[2];p[2]=j;j=q[3];q[3]=p[3];p[3]=j}if(smallval!=previouscol){netindex[previouscol]=startpos+i>>1;for(j=previouscol+1;j<smallval;j++)netindex[j]=i;previouscol=smallval;startpos=i}}netindex[previouscol]=startpos+maxnetpos>>1;for(j=previouscol+1;j<256;j++)netindex[j]=maxnetpos}function inxsearch(b,g,r){var a,p,dist;var bestd=1e3;var best=-1;var i=netindex[g];var j=i-1;while(i<netsize||j>=0){if(i<netsize){p=network[i];dist=p[1]-g;if(dist>=bestd)i=netsize;else{i++;if(dist<0)dist=-dist;a=p[0]-b;if(a<0)a=-a;dist+=a;if(dist<bestd){a=p[2]-r;if(a<0)a=-a;dist+=a;if(dist<bestd){bestd=dist;best=p[3]}}}}if(j>=0){p=network[j];dist=g-p[1];if(dist>=bestd)j=-1;else{j--;if(dist<0)dist=-dist;a=p[0]-b;if(a<0)a=-a;dist+=a;if(dist<bestd){a=p[2]-r;if(a<0)a=-a;dist+=a;if(dist<bestd){bestd=dist;best=p[3]}}}}}return best}function learn(){var i;var lengthcount=pixels.length;var alphadec=30+(samplefac-1)/3;var samplepixels=lengthcount/(3*samplefac);var delta=~~(samplepixels/ncycles);var alpha=initalpha;var radius=initradius;var rad=radius>>radiusbiasshift;if(rad<=1)rad=0;for(i=0;i<rad;i++)radpower[i]=alpha*((rad*rad-i*i)*radbias/(rad*rad));var step;if(lengthcount<minpicturebytes){samplefac=1;step=3}else if(lengthcount%prime1!==0){step=3*prime1}else if(lengthcount%prime2!==0){step=3*prime2}else if(lengthcount%prime3!==0){step=3*prime3}else{step=3*prime4}var b,g,r,j;var pix=0;i=0;while(i<samplepixels){b=(pixels[pix]&255)<<netbiasshift;g=(pixels[pix+1]&255)<<netbiasshift;r=(pixels[pix+2]&255)<<netbiasshift;j=contest(b,g,r);altersingle(alpha,j,b,g,r);if(rad!==0)alterneigh(rad,j,b,g,r);pix+=step;if(pix>=lengthcount)pix-=lengthcount;i++;if(delta===0)delta=1;if(i%delta===0){alpha-=alpha/alphadec;radius-=radius/radiusdec;rad=radius>>radiusbiasshift;if(rad<=1)rad=0;for(j=0;j<rad;j++)radpower[j]=alpha*((rad*rad-j*j)*radbias/(rad*rad))}}}function buildColormap(){init();learn();unbiasnet();inxbuild()}this.buildColormap=buildColormap;function getColormap(){var map=[];var index=[];for(var i=0;i<netsize;i++)index[network[i][3]]=i;var k=0;for(var l=0;l<netsize;l++){var j=index[l];map[k++]=network[j][0];map[k++]=network[j][1];map[k++]=network[j][2]}return map}this.getColormap=getColormap;this.lookupRGB=inxsearch}module.exports=NeuQuant},{}],4:[function(require,module,exports){var GIFEncoder,renderFrame;GIFEncoder=require("./GIFEncoder.js");renderFrame=function(frame){var encoder,page,stream,transfer;encoder=new GIFEncoder(frame.width,frame.height);if(frame.index===0){encoder.writeHeader()}else{encoder.firstFrame=false}encoder.setTransparent(frame.transparent);encoder.setRepeat(frame.repeat);encoder.setDelay(frame.delay);encoder.setQuality(frame.quality);encoder.setDither(frame.dither);encoder.setGlobalPalette(frame.globalPalette);encoder.addFrame(frame.data);if(frame.last){encoder.finish()}if(frame.globalPalette===true){frame.globalPalette=encoder.getGlobalPalette()}stream=encoder.stream();frame.data=stream.pages;frame.cursor=stream.cursor;frame.pageSize=stream.constructor.pageSize;if(frame.canTransfer){transfer=function(){var i,len,ref,results;ref=frame.data;results=[];for(i=0,len=ref.length;i<len;i++){page=ref[i];results.push(page.buffer)}return results}();return self.postMessage(frame,transfer)}else{return self.postMessage(frame)}};self.onmessage=function(event){return renderFrame(event.data)}},{"./GIFEncoder.js":1}]},{},[4]);\n//# sourceMappingURL=gif.worker.js.map\n';
+</script>
+<script>
+const C={
+  A:{frames:[],fi:0,dir:1,width:0,height:0,url:null,bounce:false,frozen:false,inv:false,bw:false,spd:10,t:0},
+  B:{frames:[],fi:0,dir:1,width:0,height:0,url:null,bounce:false,frozen:false,inv:false,bw:false,spd:10,t:0}
+};
+const S={blend:'difference',fx:new Set(),mix:0.5,int:0.4,ch:0.2,recording:false,chunks:[],mr:null,going:false};
+const bA=document.createElement('canvas'),cA=bA.getContext('2d',{willReadFrequently:true});
+const bB=document.createElement('canvas'),cB=bB.getContext('2d',{willReadFrequently:true});
+const oc=document.getElementById('oc'),cx=oc.getContext('2d',{willReadFrequently:true});
+
+async function load(file,slot){
+  if(!file)return;
+  const url=URL.createObjectURL(file),k=slot===1?'A':'B';
+  C[k].url=url;
+
+  // Fetch and decode with omggif
+  const buf=await fetch(url).then(r=>r.arrayBuffer());
+  const gr=new GifReader(new Uint8Array(buf));
+  const W=gr.width,H=gr.height;
+  C[k].width=W;C[k].height=H;
+
+  // Pre-render all frames correctly handling GIF disposal and transparency
+  const composite=document.createElement('canvas');composite.width=W;composite.height=H;
+  const cmpx=composite.getContext('2d');
+  // Saved state canvas for disposal=3
+  const saved=document.createElement('canvas');saved.width=W;saved.height=H;
+  const sctx=saved.getContext('2d');
+  // Temp canvas for blitting individual frame pixels
+  const tmp=document.createElement('canvas');
+  const tctx=tmp.getContext('2d');
+  const frames=[];
+
+  for(let i=0;i<gr.numFrames();i++){
+    const info=gr.frameInfo(i);
+    const fw=info.width,fh=info.height,fx=info.x,fy=info.y;
+    const disposal=info.disposal||0;
+
+    // Save composite state BEFORE drawing (for disposal=3 restore)
+    if(disposal===3){
+      sctx.clearRect(0,0,W,H);
+      sctx.drawImage(composite,0,0);
+    }
+
+    // Decode full W×H RGBA buffer (transparent pixels = alpha 0)
+    const px=new Uint8ClampedArray(W*H*4);
+    gr.decodeAndBlitFrameRGBA(i,px);
+
+    // Extract only the frame's sub-rectangle
+    tmp.width=fw;tmp.height=fh;
+    const subPx=new Uint8ClampedArray(fw*fh*4);
+    for(let row=0;row<fh;row++){
+      const srcOff=((fy+row)*W+fx)*4;
+      subPx.set(px.subarray(srcOff,srcOff+fw*4),row*fw*4);
+    }
+    tctx.putImageData(new ImageData(subPx,fw,fh),0,0);
+
+    // Composite onto persistent canvas using drawImage (source-over)
+    // This preserves underlying pixels where new frame is transparent
+    cmpx.drawImage(tmp,fx,fy);
+
+    // Snapshot the composite as this frame's data
+    frames.push({
+      data:cmpx.getImageData(0,0,W,H),
+      delay:Math.max((info.delay||10)*10,20)
+    });
+
+    // Apply disposal AFTER snapshot
+    if(disposal===2){
+      // Restore to background: clear this frame's region
+      cmpx.clearRect(fx,fy,fw,fh);
+    } else if(disposal===3){
+      // Restore to state saved before this frame
+      cmpx.clearRect(0,0,W,H);
+      cmpx.drawImage(saved,0,0);
+    }
+    // disposal 0 or 1: leave composite as-is for next frame
+  }
+
+  C[k].frames=frames;C[k].fi=0;C[k].dir=1;
+
+  // Size and show preview canvas
+  const pv=document.getElementById('gc'+slot);
+  pv.width=W;pv.height=H;
+  pv.getContext('2d').putImageData(frames[0].data,0,0);
+  pv.classList.add('on');
+
+  document.getElementById('lt'+slot).style.display='none';
+  document.getElementById('tx'+slot).style.display='none';
+  document.getElementById('dz'+slot).classList.add('loaded');
+  document.getElementById('led'+k).classList.add('on');
+  document.getElementById('ph').style.display='none';
+
+  // Update tempo display
+  const avgDelay=Math.round(frames.reduce((s,f)=>s+f.delay,0)/frames.length);
+  const el=document.getElementById('tp'+k);if(el)el.textContent='+'+avgDelay;
+
+  if(C.A.frames.length&&C.B.frames.length&&!S.going){S.going=true;renderLoop();}
+}
+function ov(e,s){e.preventDefault();document.getElementById('dz'+s).classList.add('over');}
+function ol(s){document.getElementById('dz'+s).classList.remove('over');}
+function od(e,s){e.preventDefault();ol(s);load(e.dataTransfer.files[0],s);}
+
+let fc=0;
+function renderLoop(){fc++;render();requestAnimationFrame(renderLoop);}
+
+function advanceChan(k,buf,bctx,slot){
+  const ch=C[k];
+  if(!ch.frames.length||ch.frozen)return;
+  const frame=ch.frames[ch.fi];
+  const delay=frame.delay/(ch.spd/10); // speed multiplier: spd=10 → normal
+  const now=performance.now();
+  if(now-ch.t<delay)return;
+  ch.t=now;
+
+  // Advance frame index
+  if(ch.bounce){
+    ch.fi+=ch.dir;
+    if(ch.fi>=ch.frames.length-1){ch.dir=-1;ch.fi=ch.frames.length-1;}
+    else if(ch.fi<=0){ch.dir=1;ch.fi=0;}
+  } else {
+    ch.fi=(ch.fi+1)%ch.frames.length;
+  }
+
+  // Draw to offscreen buffer
+  if(buf.width!==ch.width||buf.height!==ch.height){buf.width=ch.width;buf.height=ch.height;}
+  bctx.putImageData(ch.frames[ch.fi].data,0,0);
+  if(ch.inv)inv(bctx,buf.width,buf.height);
+  if(ch.bw)bw(bctx,buf.width,buf.height);
+
+  // Push processed result back to preview canvas so it reflects all toggles
+  const pv=document.getElementById('gc'+slot);
+  if(pv.width!==buf.width||pv.height!==buf.height){pv.width=buf.width;pv.height=buf.height;}
+  pv.getContext('2d').putImageData(bctx.getImageData(0,0,buf.width,buf.height),0,0);
+}
+
+function render(){
+  if(!C.A.frames.length||!C.B.frames.length)return;
+  advanceChan('A',bA,cA,1);
+  advanceChan('B',bB,cB,2);
+  const W=oc.width,H=oc.height;
+  const mixA=1-S.mix, mixB=S.mix;
+
+  cx.filter='none';
+  cx.clearRect(0,0,W,H);
+  cx.globalAlpha=mixA;cx.globalCompositeOperation='source-over';dlb(cx,bA,W,H);
+  cx.globalAlpha=mixB;cx.globalCompositeOperation=S.blend;dlb(cx,bB,W,H);
+  cx.globalAlpha=1;cx.globalCompositeOperation='source-over';
+
+  if(S.fx.size>0)apfx(cx,W,H);
+
+  // GLITCH PWR: pixel-level contrast/saturation — runs before gslice so slices are on top
+  if(S.int>0.05){
+    const id=cx.getImageData(0,0,W,H),d=id.data;
+    const contrast=(100+S.int*80)/100;
+    const saturate=(100+S.int*120)/100;
+    const bright  =(100+S.int*15)/100;
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i]*bright, g=d[i+1]*bright, b=d[i+2]*bright;
+      r=(r-128)*contrast+128; g=(g-128)*contrast+128; b=(b-128)*contrast+128;
+      const lum=0.299*r+0.587*g+0.114*b;
+      r=lum+(r-lum)*saturate; g=lum+(g-lum)*saturate; b=lum+(b-lum)*saturate;
+      d[i]  =Math.max(0,Math.min(255,r));
+      d[i+1]=Math.max(0,Math.min(255,g));
+      d[i+2]=Math.max(0,Math.min(255,b));
+    }
+    cx.putImageData(id,0,0);
+  }
+
+  // GLITCH RND: runs last so slices are always visible on top of everything
+  if(S.ch>0.01&&Math.random()<0.3+S.ch*0.7)gslice(cx,W,H);
+
+  oc.style.filter='';
+}
+
+function dlb(ctx,src,W,H){
+  const sw=src.width||W,sh=src.height||H;
+  if(!sw||!sh)return;
+  const sc=Math.min(W/sw,H/sh),dw=sw*sc,dh=sh*sc;
+  ctx.drawImage(src,(W-dw)/2,(H-dh)/2,dw,dh);
+}
+function inv(c,w,h){const d=c.getImageData(0,0,w,h);for(let i=0;i<d.data.length;i+=4){d.data[i]=255-d.data[i];d.data[i+1]=255-d.data[i+1];d.data[i+2]=255-d.data[i+2];}c.putImageData(d,0,0);}
+function bw(c,w,h){const d=c.getImageData(0,0,w,h);for(let i=0;i<d.data.length;i+=4){const g=.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2];d.data[i]=d.data[i+1]=d.data[i+2]=g;}c.putImageData(d,0,0);}
+
+function apfx(cx,W,H){
+  const it=S.int;
+  const np=S.fx.has('chromatic')||S.fx.has('pixelsort')||S.fx.has('noise')||S.fx.has('posterize')||S.fx.has('invert')||S.fx.has('vhs');
+  if(np){
+    const id=cx.getImageData(0,0,W,H),d=id.data;
+    if(S.fx.has('chromatic')){const sh=Math.floor(it*12)+2;for(let y=0;y<H;y++)for(let x=sh;x<W-sh;x++){const i=(y*W+x)*4,ir=(y*W+Math.min(W-1,x+sh))*4,ib=(y*W+Math.max(0,x-sh))*4;d[i]=d[ir];d[i+2]=d[ib+2];}}
+    if(S.fx.has('noise')){const a=it*80;for(let i=0;i<d.length;i+=4){const n=(Math.random()-.5)*a;d[i]=Math.max(0,Math.min(255,d[i]+n));d[i+1]=Math.max(0,Math.min(255,d[i+1]+n));d[i+2]=Math.max(0,Math.min(255,d[i+2]+n));}}
+    if(S.fx.has('posterize')){const lv=Math.max(2,Math.floor((1-it)*8)+2),st=255/(lv-1);for(let i=0;i<d.length;i+=4){d[i]=Math.round(d[i]/st)*st;d[i+1]=Math.round(d[i+1]/st)*st;d[i+2]=Math.round(d[i+2]/st)*st;}}
+    if(S.fx.has('invert')){for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2];}}
+    if(S.fx.has('vhs')){const bl=Math.floor(it*6)+2;for(let y=0;y<H;y++)for(let x=0;x<W-bl;x++){const i=(y*W+x)*4,j=(y*W+x+bl)*4;d[i]=(d[i]*.7+d[j]*.3)|0;}}
+    if(S.fx.has('pixelsort')){const thr=255-it*200,rows=Math.floor(H*(.3+it*.5));for(let r=0;r<rows;r++){const y=Math.floor(Math.random()*H);let st=-1;for(let x=0;x<=W;x++){const i=(y*W+x)*4,lm=.299*d[i]+.587*d[i+1]+.114*d[i+2];if(lm>thr&&st===-1)st=x;else if((lm<=thr||x===W)&&st!==-1){const sg=[];for(let k=st;k<x;k++){const ki=(y*W+k)*4;sg.push([.299*d[ki]+.587*d[ki+1]+.114*d[ki+2],d[ki],d[ki+1],d[ki+2],d[ki+3]]);}sg.sort((a,b)=>a[0]-b[0]);for(let k=0;k<sg.length;k++){const ki=(y*W+st+k)*4;d[ki]=sg[k][1];d[ki+1]=sg[k][2];d[ki+2]=sg[k][3];d[ki+3]=sg[k][4];}st=-1;}}}}
+    cx.putImageData(id,0,0);
+  }
+  if(S.fx.has('scanlines')){const sp=Math.max(2,Math.floor((1-it)*6)+2);cx.fillStyle=`rgba(0,0,0,${.1+it*.4})`;for(let y=0;y<H;y+=sp)cx.fillRect(0,y,W,1);}
+  if(S.fx.has('displace')){const mg=it*20,t=fc*.04;for(let i=0;i<5;i++){const sy=Math.floor((Math.sin(t+i*1.3)*.5+.5)*H),sh=Math.max(1,Math.floor(mg*Math.random())),dx=Math.floor((Math.random()-.5)*mg);if(sy+sh<H){const s=cx.getImageData(0,sy,W,sh);cx.putImageData(s,dx,sy);}}}
+}
+function gslice(cx,W,H){
+  const n=1+Math.floor(S.ch*8);
+  for(let i=0;i<n;i++){
+    const y=Math.floor(Math.random()*H);
+    const h=Math.floor(Math.random()*H*.15)+4;
+    // Guarantee minimum shift of 8px so it's always visible
+    const minShift=8+Math.floor(S.ch*W*0.15);
+    const dx=(Math.random()<0.5?1:-1)*(minShift+Math.floor(Math.random()*W*S.ch));
+    if(y+h<H){const s=cx.getImageData(0,y,W,h);cx.putImageData(s,dx,y);}
+  }
+  if(S.ch>0.5&&Math.random()<S.ch*.4){
+    const id=cx.getImageData(0,0,W,H),d=id.data,sh=Math.floor(S.ch*20);
+    for(let y=0;y<H;y++)for(let x=sh;x<W-sh;x++){const i=(y*W+x)*4,ir=(y*W+x+sh)*4;d[i]=d[ir];}
+    cx.putImageData(id,0,0);
+  }
+}
+
+// Purge a completed recording when any setting changes — prevents stale export
+function purgeIfDone(){
+  if(!S.recording && S.chunks.length){
+    S.chunks=[];
+    ['btnExp','btnExpGif'].forEach(id=>{
+      const b=document.getElementById(id);
+      b.disabled=true;b.classList.remove('exp');
+    });
+  }
+}
+
+function sv(p,v){
+  purgeIfDone();
+  const m={mix:'vMix',int:'vInt',ch:'vCh'};
+  const el=document.getElementById(m[p]);if(el)el.textContent=v;
+  if(p==='mix')S.mix=v/100;
+  if(p==='int')S.int=v/100;
+  if(p==='ch')S.ch=v/100;
+}
+function spd(k,v){
+  purgeIfDone();
+  C[k].spd=+v;
+  C[k].t=0;
+  document.getElementById('vs'+k).textContent=v;
+  if(C[k].frames.length){
+    const avg=Math.round(C[k].frames.reduce((s,f)=>s+f.delay,0)/C[k].frames.length);
+    const el=document.getElementById('tp'+k);
+    if(el)el.textContent='+'+(Math.round(avg/(+v/10)));
+  }
+}
+function tgl(k,prop){
+  purgeIfDone();
+  C[k][prop]=!C[k][prop];
+  const ids={bounce:'lp',inv:'iv',bw:'bw'};
+  document.getElementById(ids[prop]+k).classList.toggle('on',C[k][prop]);
+  if(prop==='bw'||prop==='inv') C[k].t=0;
+  if(prop==='bw'){
+    const bezel=document.getElementById('bezel'+k);
+    if(bezel)bezel.classList.toggle('bw-on',C[k].bw);
+  }
+}
+function seq(k){
+  purgeIfDone();
+  C[k].frozen=!C[k].frozen;
+  document.getElementById('sq'+k).classList.toggle('on',C[k].frozen);
+}
+function fx(n){purgeIfDone();S.fx.has(n)?S.fx.delete(n):S.fx.add(n);document.getElementById('fx-'+n).classList.toggle('on',S.fx.has(n));}
+function blFromSelect(sel){
+  bl(sel.value, null); // null = no button to highlight (dropdown handles its own state)
+}
+function bl(m,btn){
+  purgeIfDone();
+  S.blend=m;
+  document.getElementById('tg').querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  if(btn){btn.classList.add('on');document.getElementById('tg').classList.add('sel');}
+  // Sync mobile dropdown
+  const sel=document.getElementById('trSel');
+  if(sel) sel.value=m;
+}
+const BMS=['multiply','screen','overlay','hard-light','difference','exclusion','color-dodge','xor','hue','saturation','luminosity'];
+const FXS=['chromatic','scanlines','pixelsort','noise','displace','posterize','invert','vhs'];
+function rnd(){
+  purgeIfDone();
+  const m=BMS[Math.floor(Math.random()*BMS.length)];
+  const btn=[...document.getElementById('tg').querySelectorAll('.tb')].find(b=>b.getAttribute('onclick').includes("'"+m+"'"));
+  bl(m,btn||null);
+  S.fx.clear();FXS.forEach(f=>document.getElementById('fx-'+f).classList.remove('on'));
+  [...FXS].sort(()=>Math.random()-.5).slice(0,Math.floor(Math.random()*4)+1).forEach(f=>{S.fx.add(f);document.getElementById('fx-'+f).classList.add('on');});
+  const set=(id,v)=>{const e=document.getElementById(id);if(e){e.value=v;e.dispatchEvent(new Event('input'));}};
+  set('slMix',Math.floor(Math.random()*70)+15);
+  set('slInt',Math.floor(Math.random()*80)+10);
+  set('slCh',Math.floor(Math.random()*60));
+}
+let rs=0,ri=null;
+function rec(){
+  if(!C.A.frames.length||!C.B.frames.length){alert('Load two GIFs first.');return;}
+  if(!S.recording){
+    const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(t=>{try{return MediaRecorder.isTypeSupported(t);}catch(e){return false;}})||'';
+    let stream;try{stream=oc.captureStream(30);}catch(e){alert('Not supported.');return;}
+    S.chunks=[];
+    try{S.mr=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);}catch(e){alert(e.message);return;}
+    S.mr.ondataavailable=e=>{if(e.data.size>0)S.chunks.push(e.data);};
+    S.mr.onstop=()=>{
+      if(S.chunks.length){
+        document.getElementById('btnExp').disabled=false;
+        document.getElementById('btnExp').classList.add('exp');
+        document.getElementById('btnExpGif').disabled=false;
+        document.getElementById('btnExpGif').classList.add('exp');
+      }
+    };
+    S.mr.start(200);S.recording=true;
+    // Reset export buttons to grey
+    ['btnExp','btnExpGif'].forEach(id=>{
+      const b=document.getElementById(id);
+      b.disabled=true;b.classList.remove('exp');
+    });
+    document.getElementById('btnRec').textContent='■ STOP';
+    document.getElementById('btnRec').classList.add('on');
+    document.getElementById('ledRec').classList.add('on');
+    document.getElementById('outWrap').classList.add('rec');
+    document.getElementById('rd').classList.add('on');
+    document.getElementById('ro').classList.add('on');
+    document.getElementById('btnExp').disabled=true;
+    rs=Date.now();
+    ri=setInterval(()=>{const s=Math.floor((Date.now()-rs)/1000),m=Math.floor(s/60),t=m+':'+String(s%60).padStart(2,'0');document.getElementById('rt').textContent=t;document.getElementById('ro').textContent=t;},500);
+  }else{
+    S.mr.stop();S.recording=false;clearInterval(ri);
+    document.getElementById('btnRec').textContent='REC';
+    document.getElementById('btnRec').classList.remove('on');
+    document.getElementById('ledRec').classList.remove('on');
+    document.getElementById('outWrap').classList.remove('rec');
+    document.getElementById('rd').classList.remove('on');
+    document.getElementById('ro').classList.remove('on');
+  }
+}
+function exp(){
+  if(!S.chunks.length)return;
+  const blob=new Blob(S.chunks,{type:'video/webm'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='gifxer_'+Date.now()+'.webm';a.click();
+  URL.revokeObjectURL(url);
+}
+
+function expGif(){
+  if(!S.chunks.length)return;
+  const btn=document.getElementById('btnExpGif');
+  btn.textContent='PREPARING...';btn.disabled=true;
+
+  const webmBlob=new Blob(S.chunks,{type:'video/webm'});
+  const webmUrl=URL.createObjectURL(webmBlob);
+  const video=document.createElement('video');
+  video.src=webmUrl;video.muted=true;video.preload='auto';
+  video.style.cssText='position:fixed;left:-9999px;top:0;width:480px;height:360px;';
+  document.body.appendChild(video);
+
+  const cap=document.createElement('canvas');
+  const cctx=cap.getContext('2d');
+  const fps=15;
+  let fi=0,frameCount=0;
+  const frames=[];
+
+  video.addEventListener('loadedmetadata',()=>{
+    cap.width=video.videoWidth||480;
+    cap.height=video.videoHeight||360;
+    frameCount=Math.max(1,Math.floor(video.duration*fps));
+    btn.textContent='READING 0%';
+    video.currentTime=0;
+  });
+
+  video.addEventListener('seeked',()=>{
+    cctx.clearRect(0,0,cap.width,cap.height);
+    cctx.drawImage(video,0,0,cap.width,cap.height);
+    frames.push(cctx.getImageData(0,0,cap.width,cap.height));
+    fi++;
+    btn.textContent='READING '+Math.round((fi/frameCount)*100)+'%';
+    if(fi<frameCount) video.currentTime=fi/fps;
+    else encode();
+  });
+
+  video.load();
+
+  function encode(){
+    document.body.removeChild(video);
+    URL.revokeObjectURL(webmUrl);
+    btn.textContent='ENCODING...';
+
+    // Check frames aren't all black
+    const f0=frames[0];
+    let hasColor=false;
+    for(let i=0;i<Math.min(f0.data.length,4000);i+=4){
+      if(f0.data[i]>5||f0.data[i+1]>5||f0.data[i+2]>5){hasColor=true;break;}
+    }
+    if(!hasColor){
+      btn.textContent='READ ERR';btn.disabled=false;
+      console.error('Frames black — video decode failed in this browser');
+      return;
+    }
+
+    // Create blob URL for gif.worker.js to avoid CORS
+    const workerBlob=new Blob([_gifWorkerSrc],{type:'application/javascript'});
+    const workerUrl=URL.createObjectURL(workerBlob);
+
+    const gif=new GIF({
+      workers:2,quality:10,
+      width:cap.width,height:cap.height,
+      workerScript:workerUrl
+    });
+
+    // Add frames via temp canvas
+    const tmp=document.createElement('canvas');
+    tmp.width=cap.width;tmp.height=cap.height;
+    const tctx=tmp.getContext('2d');
+    frames.forEach(imgData=>{
+      tctx.putImageData(imgData,0,0);
+      gif.addFrame(tctx,{delay:Math.round(1000/fps),copy:true});
+    });
+
+    gif.on('finished',blob=>{
+      URL.revokeObjectURL(workerUrl);
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download='gifxer_'+Date.now()+'.gif';a.click();
+      URL.revokeObjectURL(url);
+      btn.textContent='EXPORT GIF';btn.disabled=false;
+    });
+
+    gif.on('progress',p=>{
+      btn.textContent='GIF '+Math.round(p*100)+'%';
+    });
+
+    gif.render();
+  }
+}
+</script>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}</script>
+</body>
+</html>
